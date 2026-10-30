@@ -52,23 +52,40 @@ Invoke-RestMethod "$env:OLLAMA_BASE_URL/models" -Headers @{Authorization = "Bear
 
 即使入口使用 Cloudflare Tunnel，`LLM_PROVIDER` 仍是 `ollama`；下方「Cloudflare → Claude」是另一種由雲端模型運算、使用不同憑證與計費的服務。
 
-### 虛擬機負責人的操作與限制
+### 虛擬機負責人的啟動、停用與換金鑰
 
-本次部署為 `Ollama (127.0.0.1:11434) → Caddy 金鑰閘道 (127.0.0.1:11435) → Cloudflare Tunnel`。2026-10-30 的模型 API smoke 已確認模擬問答回覆、100% GPU、32768 context、無／錯誤金鑰回傳 401、管理路徑回傳 404；沒有把這些連通性檢查當成課業答案正確率測試。
+API 閘道只做金鑰驗證、路徑保護與每分鐘頻率限制，不限制已安裝模型、輸出 token、上下文、訊息長度或工具呼叫參數。OpenAI 相容的 `tools`、`tool_calls`、工具訊息與生成參數會原樣轉送；模型及 Ollama 自身的限制仍適用。MCP 工具由組員的 client 執行，這個模型 API 不提供虛擬機的 shell 或檔案操作。
 
-- 使用本機服務資料夾的 `Start-API.ps1`／`Stop-API.ps1` 管理公開入口；這兩個管理腳本由虛擬機負責人另外保管，不包含在本專案。啟動前需有本機 Ollama；停止入口會關閉閘道與 Tunnel，保留本機 Ollama。
-- 啟動後從該服務資料夾的 `endpoint.txt` 取得目前 API base URL，從 `api-key.txt` 取得金鑰，再私下通知組員。不要把金鑰、這些本機檔案或會失效的臨時網址提交到 Git。網頁、程式與批次測試都要使用更新後的網址，並重新啟動原本的程式。
-- Quick Tunnel 可免費建立，不需帳號或網域，但重啟後網址會改、沒有 uptime 保證，且不支援 SSE；本專案使用 `stream=false`。長期固定網址需另設 named tunnel 與可用網域／子網域，網域註冊費另計。[免費入口](https://developers.cloudflare.com/workers/wrangler/commands/tunnel/)、[限制](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
-- 虛擬機及 Tunnel 需持續運作；目前未設定 Windows 服務或開機自動啟動。Cloudflare 只提供傳輸入口，模型仍在虛擬機運算；請求與回答會經過 Cloudflare，使用真實課程或學生資料前需符合學校與資料使用規範。
-- 閘道只接受帶金鑰的 `GET /v1/models` 與 `POST /v1/chat/completions`，不公開 Ollama 管理 API、檔案或系統命令。請求上限 2 MB、聊天同時連線上限 2、上游回應標頭等待上限 180 秒；這不是每人配額或完整 rate limiting，批次測試請避免大量並行。
+虛擬機端需要 PowerShell 7、Python 3.11 以上、官方 cloudflared；Ollama 必須只監聽本機 11434。在專案根目錄執行：
+
+```powershell
+.venv\Scripts\python.exe -m pip install -r requirements-gateway.txt
+# 第一次或要撤銷舊金鑰時使用 -RotateKey。
+.\tools\Start-SharedOllamaApi.ps1 -RotateKey -RequestsPerMinute 30
+```
+
+啟動腳本先確認 Ollama 與閘道都只監聽本機、驗證匿名請求被拒絕，再建立 Tunnel。任何啟動步驟失敗都會停止此次建立的程序。金鑰不出現在程序參數、終端輸出或存取 log。
+
+- 私有狀態目錄是 `$env:LOCALAPPDATA\TronClassOllamaAPI`，不在 Git checkout 裡；ACL 僅授權目前 Windows 使用者與 SYSTEM。管理員或已取得同一使用者權限的程式仍可能讀取，這不是整台虛擬機的安全保證。
+- 在狀態目錄的 `endpoint.txt` 查看 API base URL、`api-key.txt` 取得金鑰，私下交給組員；不要貼到公開 README、issue、PR、截圖或聊天紀錄。金鑰、入口、程序狀態與 log 檔名也已加入 `.gitignore`。
+- 預設所有組員共用 **30 次／滑動 60 秒**，模型清單與問答都計入；超過時回傳 `429` 與 `Retry-After`。沒有每小時配額或同時執行數限制；單次複雜任務仍可能消耗大量 GPU／記憶體，請觀察壓力測試。
+- 調整頻率：先停止再以 `Start-SharedOllamaApi.ps1 -RequestsPerMinute 120` 啟動；不帶 `-RotateKey` 會保留金鑰。限制由虛擬機端設定，client 不能自行提高。重啟會重置記憶體中的計數。
+- 緊急停止：執行 `.\tools\Stop-SharedOllamaApi.ps1`。只停止記錄且啟動時間匹配的閘道／Tunnel 程序，本機 Ollama 保留。
+- 金鑰疑似外洩：先停止，再以 `-RotateKey` 啟動，私下重新發送新金鑰與新入口。只刪 README 或把 repo 改私人不會撤銷憑證。
+- 本機預檢：`Start-SharedOllamaApi.ps1 -RotateKey -LocalOnly` 不建立 Tunnel；測完先停止，再正常啟動。
+- Quick Tunnel 免費且不需帳號或網域，但重啟後網址會改、沒有 uptime 保證，且官方不支援 SSE。閘道本身能轉送串流，但 **Quick Tunnel 請用 `stream=false`**；要測 SSE，請改用支援 SSE 的 named tunnel 或其他 HTTPS 入口並實測。網域註冊費另計。[免費入口](https://developers.cloudflare.com/workers/wrangler/commands/tunnel/)、[限制](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
+- 虛擬機及 Tunnel 需持續運作；沒有開機自動啟動。Cloudflare 提供傳輸入口，模型仍在虛擬機運算；問題與回答會經過 Cloudflare，不要用未獲授權的真實學生資料測試。
+- 對外只提供帶金鑰的 `GET /v1/models` 與 `POST /v1/chat/completions`；管理 API、docs、其他路徑、query 憑證及帶 Origin 的瀏覽器跨站請求都被拒絕。不跟隨上游重新導向、不把組員金鑰轉送給 Ollama，也不回傳上游錯誤細節。
+- 腳本不修改 Windows／學校防火牆，不開放 11434 或 11435 的外網入站。既有 SSH、SMB、系統服務與更新仍由虛擬機／學校管理員維護。
+- 問答下載及批次 JSONL／CSV 改記 `connection`（例如 `remote_https`），不記錄真實 `base_url`；設定中的 DB／prompt 路徑只輸出檔名，模型與其他實驗參數保留。這不會清除過去匯出的檔案，也不會遮蔽使用者自己寫進問題或答案的內容。
 
 | 症狀 | 處理方式 |
 |---|---|
-| HTTP 401 | 確認已設定正確的 `OLLAMA_API_KEY`，並從同一個 PowerShell 重啟程式；不要把金鑰貼進錯誤回報 |
-| HTTP 404 | 確認 base URL 含 `/v1`、入口未更換、模型名稱完整且存在 |
-| HTTP 502／530、DNS 錯誤或無法連線 | 請負責人檢查虛擬機、Ollama、閘道與 Tunnel，取得目前入口後重啟程式 |
-| HTTP 503 | 可能達同時連線上限，等待其他請求結束後重試 |
-| 初次載入或問答逾時 | 請負責人先完成模型暖機、檢查 GPU／context，避免多人同時重試 |
+| HTTP 401 | 確認新金鑰及 `OLLAMA_API_KEY`；不要在錯誤回報貼金鑰 |
+| HTTP 429 | 按 `Retry-After` 等待；大量測試由負責人調高頻率 |
+| HTTP 404 | 確認網址含 `/v1`、入口未更換、路徑屬於允許的 API |
+| HTTP 502／530、DNS 或連線錯誤 | 檢查本機 Ollama、閘道與 Tunnel |
+| 模型繁忙、逾時或任務太長 | 檢查 GPU／Ollama、模型 context 與 client timeout；閘道不額外限制生成長度，Tunnel 自身限制仍適用 |
 
 ## Cloudflare → Claude
 
@@ -204,7 +221,7 @@ $env:OLLAMA_MODEL = "你們固定的模型名稱"
 結果逐次立即寫入 `results/` 的 JSONL 與 UTF-8 CSV，既有檔案不會被覆寫。可用 `--output results/run_name.jsonl` 指定新檔名。保存內容包含：
 
 - 問題、預期答案、題型、人工判分標準、實際回答。
-- 時間、耗時、provider、請求／回傳模型名稱、temperature、實際適用的 seed、輸出上限、網址、情境時間。
+- 時間、耗時、provider、請求／回傳模型名稱、temperature、實際適用的 seed、輸出上限、連線類型（不含真實 API 網址）、情境時間。
 - 可見資料、prompt、完整 messages 的 SHA-256，以及服務回傳的 token usage／finish reason。
 - 執行錯誤、人工正誤欄位及備註。連線錯誤記為 error，**不算 AI 回答錯誤**。
 

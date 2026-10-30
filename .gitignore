@@ -14,3 +14,10 @@ tmp/
 *.db-wal
 *.db-shm
 *.db-journal
+
+# Private local API runtime state; never commit live connection details.
+api-key.txt
+endpoint.txt
+processes.json
+gateway.*.log
+tunnel.*.log
