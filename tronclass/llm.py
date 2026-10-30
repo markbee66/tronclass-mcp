@@ -1,6 +1,7 @@
 """Model adapters. Credentials never enter public settings or result metadata."""
 
 import json
+import os
 import socket
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
@@ -55,6 +56,8 @@ class HttpModelClient:
                 }
                 hint = hints.get(exc.code, "請確認模型、帳戶權限與 Cloudflare 服務狀態。")
                 raise ModelError(f"Cloudflare 回傳 HTTP {exc.code}。{hint}") from None
+            if exc.code == 401:
+                raise ModelError("模型服務回傳 HTTP 401，請確認 OLLAMA_API_KEY 與遠端閘道的金鑰設定。") from None
             raise ModelError(f"模型服務回傳 HTTP {exc.code}，請確認網址與模型名稱。") from exc
         except (TimeoutError, socket.timeout) as exc:
             raise ModelError("模型回應逾時，請增加 LLM_TIMEOUT_SECONDS 或確認模型執行狀況。") from exc
@@ -71,8 +74,13 @@ class HttpModelClient:
 
 class OllamaClient(HttpModelClient):
 
+    def _headers(self):
+        # Keep the optional gateway credential out of Settings and result metadata.
+        token = os.getenv("OLLAMA_API_KEY", "").strip()
+        return {"Authorization": f"Bearer {token}"} if token else {}
+
     def list_models(self) -> list[str]:
-        body = self._request("/models", timeout=min(self.settings.timeout_seconds, 5))
+        body = self._request("/models", timeout=min(self.settings.timeout_seconds, 5), headers=self._headers())
         models = body.get("data")
         if not isinstance(models, list) or any(not isinstance(m, dict) or not isinstance(m.get("id"), str) for m in models):
             raise ModelError("模型清單格式錯誤。")
@@ -88,7 +96,7 @@ class OllamaClient(HttpModelClient):
             "seed": self.settings.seed,
             "max_tokens": self.settings.max_tokens,
             "stream": False,
-        })
+        }, headers=self._headers())
         try:
             choice = body["choices"][0]
             text = choice["message"]["content"]
