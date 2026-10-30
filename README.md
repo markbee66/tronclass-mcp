@@ -8,7 +8,7 @@
 
 已完成 Streamlit 聊天／資料查詢、SQLite 唯讀資料層、可替換的模型 adapter、批次測試入口，以及程式整合測試。2026-10-30 已在學校虛擬機驗證 Ollama 模型 API 的 GPU 推論、HTTPS 連線與金鑰保護；這不代表完整課業問答正確率已驗證。目前 Cloudflare Claude 的實測則因帳戶餘額不足回傳 HTTP 402，不代表已完成模型回答驗證。
 
-Ollama 負責人可先指定已安裝模型，再啟動同一個介面；若 Ollama 位於另一台機器，設定 `OLLAMA_BASE_URL`；有金鑰保護時另設 `OLLAMA_API_KEY`，詳見下方共用模型步驟：
+Ollama 負責人可先指定已安裝模型，再啟動同一個介面。遠端共用模型請依下方介面步驟輸入網址與金鑰；CLI／批次評估仍可使用 `OLLAMA_BASE_URL` 與 `OLLAMA_API_KEY`。以下為本機啟動範例：
 
 ```powershell
 $env:LLM_PROVIDER = "ollama"
@@ -25,6 +25,20 @@ $env:OLLAMA_MODEL = "填入 ollama list 顯示的完整名稱"
 
 ### 組員設定
 
+#### 從 Streamlit 介面連線（建議）
+
+1. 依下方「啟動」建立 Python 虛擬環境、安裝套件，再執行 `.venv\Scripts\python.exe -m streamlit run app.py`。開啟 `http://localhost:8501`；這是你電腦上的介面，XAMPP 不負責啟動它。
+2. 左側「模型服務」選 **Ollama**，「Ollama 連線方式」選 **遠端 Ollama API**。底層仍使用 `provider=ollama`。
+3. 在 **API base URL** 貼上負責人提供的目前網址，必須包含 `/v1`，例如 `https://<目前入口>/v1`。遠端含金鑰連線必須使用 HTTPS；只有 localhost／loopback 可用 HTTP。網址不可包含金鑰、帳密或 query string。
+4. 在遮蔽的 **API key** 欄位輸入負責人私下提供的金鑰（公開示例：`fake-team-key-do-not-use`）。金鑰只留在目前 Streamlit session，不會存檔或修改全域環境變數；介面不會自動讀取 `OLLAMA_API_KEY`。
+5. 可先手動填入完整 **模型名稱**，或按 **檢查連線**，成功後用 **從模型清單選擇** 填入。連線檢查查詢 `/models`，不會產生模型回答；確認模型可推論仍需送出問題。畫面 rerun 不會自動查詢清單。
+6. 送出課業問題。檢查連線與問答共用目前網址、金鑰及模型設定，請求由 Python 後端發送，Quick Tunnel 使用 `stream=false`。切換網址、金鑰、模型或連線方式會清除過期連線狀態、模型清單及原對話；選取清單模型後可再按檢查連線。
+7. 使用完畢按 **清除連線／金鑰**，移除遠端網址、金鑰、模型與對話。session 結束後需重新輸入。切換到 **本機 Ollama** 可連接沒有金鑰的本機服務；原有 **Cloudflare → Claude** 仍依本機設定使用。
+
+若缺少設定，依欄位提示補齊；HTTP 401 請確認金鑰，404 請確認完整模型名稱、`/v1` 與目前入口，429 請依 `Retry-After` 提示等待，頻率限制由伺服器控制。逾時請稍後重試或聯絡負責人；入口失效／離線時取得新網址再檢查。為保護金鑰，程式不跟隨重新導向，請使用正確 API 入口。
+
+#### CLI／環境變數方式（保留相容性）
+
 先取得已包含本節金鑰支援的專案版本；如果先前手動套用過 `tronclass-api-key.patch`，請先檢查自己的 diff，勿重複套用。依下方「啟動」建立 Python 3.11 以上的 `.venv` 並安裝依賴，再向虛擬機負責人私下取得三項資料：
 
 | 項目 | 範例／說明 |
@@ -33,7 +47,7 @@ $env:OLLAMA_MODEL = "填入 ollama list 顯示的完整名稱"
 | 模型名稱 | 本次部署為 `tronclass-system1:latest`，由 `qwen3:8b` 建立，context 設為 32768 |
 | API key | 負責人提供的組員存取金鑰，不是 Cloudflare token 或 Ollama 雲端金鑰 |
 
-在專案根目錄的同一個 PowerShell 設定並啟動：
+CLI／批次評估可在專案根目錄的同一個 PowerShell 設定：
 
 ```powershell
 $env:LLM_PROVIDER = "ollama"
@@ -43,12 +57,11 @@ $env:OLLAMA_MODEL = "tronclass-system1:latest"
 $apiCredential = Get-Credential -UserName "api" -Message "請在密碼欄貼上組員 API key"
 $env:OLLAMA_API_KEY = $apiCredential.GetNetworkCredential().Password
 
-# 先測模型清單，成功後啟動原本的介面。
+# 先測模型清單；後續批次命令請參考下方「批次 AI 測試」。
 Invoke-RestMethod "$env:OLLAMA_BASE_URL/models" -Headers @{Authorization = "Bearer $env:OLLAMA_API_KEY"}
-.venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-打開 `http://localhost:8501`，選擇 Ollama、按「檢查模型連線」後送出問題。這裡的 `localhost:8501` 是組員自己的介面，不是虛擬機 API。程式會在模型清單與問答請求都加上 `Authorization: Bearer ...`；金鑰只從環境讀取，不放入 `Settings`、模型 metadata 或匯出紀錄。本機無驗證的 Ollama 可以不設定此變數。
+以上環境設定保留給 CLI／批次評估使用；Streamlit 請依上方介面步驟輸入網址、金鑰及模型，再按「檢查連線」。`localhost:8501` 是組員自己的介面，不是虛擬機 API。程式會在模型清單與問答請求都加上 `Authorization: Bearer ...`；CLI 金鑰從環境讀取，介面金鑰由目前 session 注入，不放入 `Settings`、模型 metadata 或匯出紀錄。本機無驗證的 Ollama 不需要金鑰。
 
 即使入口使用 Cloudflare Tunnel，`LLM_PROVIDER` 仍是 `ollama`；下方「Cloudflare → Claude」是另一種由雲端模型運算、使用不同憑證與計費的服務。
 
@@ -81,7 +94,7 @@ API 閘道只做金鑰驗證、路徑保護與每分鐘頻率限制，不限制�
 
 | 症狀 | 處理方式 |
 |---|---|
-| HTTP 401 | 確認新金鑰及 `OLLAMA_API_KEY`；不要在錯誤回報貼金鑰 |
+| HTTP 401 | 介面更新 API key 欄位；CLI 確認 `OLLAMA_API_KEY`；不要在錯誤回報貼金鑰 |
 | HTTP 429 | 按 `Retry-After` 等待；大量測試由負責人調高頻率 |
 | HTTP 404 | 確認網址含 `/v1`、入口未更換、路徑屬於允許的 API |
 | HTTP 502／530、DNS 或連線錯誤 | 檢查本機 Ollama、閘道與 Tunnel |
@@ -89,7 +102,7 @@ API 閘道只做金鑰驗證、路徑保護與每分鐘頻率限制，不限制�
 
 ## Cloudflare → Claude
 
-介面左側可切換 **Cloudflare → Claude** 與 **Ollama（本機）**，不需改動 System 1、SQLite 或測試題。Cloudflare 使用帳戶 REST API 的 Anthropic Messages 格式，預設模型為 `anthropic/claude-haiku-4.5`。底層 adapter 會把共用 messages 中的 system 訊息移到 Anthropic 的 `system` 欄位，其餘對話順序保持一致。
+介面左側可切換 **Cloudflare → Claude** 與 **Ollama**（本機或遠端），不需改動 System 1、SQLite 或測試題。Cloudflare 使用帳戶 REST API 的 Anthropic Messages 格式，預設模型為 `anthropic/claude-haiku-4.5`。底層 adapter 會把共用 messages 中的 system 訊息移到 Anthropic 的 `system` 欄位，其餘對話順序保持一致。
 
 將 `.streamlit/secrets.example.toml` 複製為 `.streamlit/secrets.toml`，只在本機填入帳戶 ID 與 token。該檔已被 Git 忽略；金鑰不放在 `Settings`、模型 metadata 或匯出紀錄中。環境變數可覆寫同名設定，程式不會自動讀取上層 `.env`。
 
@@ -123,7 +136,7 @@ $env:OLLAMA_MODEL = "填入已安裝模型的完整名稱與 tag"
 .venv\Scripts\python.exe -m streamlit run app.py
 ```
 
-若本機尚未啟動 Ollama，可另外開終端機執行 `ollama serve`；已在背景執行時不必重複啟動。左側「檢查模型連線」會查詢可用模型。連線失敗會顯示錯誤，不會產生假的 AI 回答。
+若本機尚未啟動 Ollama，可另外開終端機執行 `ollama serve`；已在背景執行時不必重複啟動。左側「檢查連線」會查詢可用模型。連線失敗會顯示錯誤，不會產生假的 AI 回答。
 
 開啟 `http://localhost:8501`：
 
@@ -186,7 +199,7 @@ System 2 可新增獨立 Coordinator，實作 `AssistantBackend.answer()` 後調
 | `LLM_PROVIDER` | `ollama`，可由本機 `[app] provider` 選為 `cloudflare` |
 | `OLLAMA_BASE_URL` | `http://localhost:11434/v1` |
 | `OLLAMA_MODEL` | 空白，需填已安裝的完整名稱 |
-| `OLLAMA_API_KEY` | 空白；遠端閘道有金鑰保護時必填，只從環境讀取，不匯出 |
+| `OLLAMA_API_KEY` | CLI／批次使用，遠端閘道有金鑰保護時必填，不匯出；Streamlit 改用 session 密碼欄位 |
 | `CLOUDFLARE_ACCOUNT_ID` | 空白，使用 Cloudflare 時必填 |
 | `CLOUDFLARE_API_TOKEN` | 只從本機設定或環境讀取，不匯出 |
 | `CLOUDFLARE_MODEL` | `anthropic/claude-haiku-4.5` |
@@ -235,7 +248,7 @@ CSV 的 `human_correct`、`review_notes` 供整理 Verification Log；目前不�
 .venv\Scripts\python.exe -m pytest -q
 ```
 
-使用原始 SQLite fixture、Streamlit AppTest、本機模擬 HTTP 模型服務，不需要下載模型。測試隔離本機與環境中的 Cloudflare 憑證，僅使用假 token。這些測試驗證程式整合，實際模型推理與錯誤率需另行執行上方 AI 測試。
+使用原始 SQLite fixture、Streamlit AppTest、本機模擬 HTTP 模型服務，不需要下載模型。測試隔離本機設定與環境中的 Ollama／Cloudflare 憑證，僅使用假金鑰與假服務，涵蓋 session 隔離、設定切換及匯出防洩漏。這些測試驗證程式整合，實際模型推理與錯誤率需另行執行上方 AI 測試。
 
 ## 範例資料
 

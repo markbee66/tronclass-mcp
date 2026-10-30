@@ -19,7 +19,10 @@ def model_server():
         def do_GET(self):
             state["headers"].append(dict(self.headers))
             state["requests"].append((self.path, None))
-            self.respond({"data": [{"id": "fixture-model"}]})
+            if self.path.endswith("/user/tokens/verify"):
+                self.respond({"success": True, "result": {"status": "active"}})
+            else:
+                self.respond(state.get("models_body", {"data": [{"id": "fixture-model"}]}))
 
         def do_POST(self):
             state["headers"].append(dict(self.headers))
@@ -31,6 +34,8 @@ def model_server():
             encoded = json.dumps(body).encode()
             self.send_response(state["status"])
             self.send_header("Content-Type", "application/json")
+            if "retry_after" in state:
+                self.send_header("Retry-After", state["retry_after"])
             if state["status"] == 302:
                 self.send_header("Location", "/credential-leak-target")
             self.send_header("Content-Length", str(len(encoded)))
@@ -177,3 +182,68 @@ def test_ollama_redirect_is_not_followed_with_api_key(model_server, monkeypatch)
     assert len(state["requests"]) == 1
     headers = {key.lower(): value for key, value in state["headers"][0].items()}
     assert headers["authorization"] == "Bearer fake-ollama-key"
+
+
+def test_explicit_keys_override_environment_and_are_not_repr_or_exports(model_server, monkeypatch):
+    from dataclasses import asdict
+    url, state = model_server
+    monkeypatch.setenv("OLLAMA_API_KEY", "fake-env-key")
+    first = OllamaClient(Settings(base_url=url, model="fixture-model"), api_key="fake-first-key")
+    second = OllamaClient(Settings(base_url=url, model="fixture-model"), api_key="fake-second-key")
+    first.list_models()
+    second.list_models()
+    assert [h["Authorization"] for h in state["headers"]] == ["Bearer fake-first-key", "Bearer fake-second-key"]
+    assert "fake-first-key" not in repr(first)
+    assert "api_key" not in asdict(first.settings)
+    state["body"]["choices"][0]["message"]["content"] = "fake-first-key " + url
+    state["body"]["usage"] = {"echo": "fake-first-key " + url}
+    result = json.dumps(asdict(first.complete([])))
+    assert "fake-first-key" not in result and url not in result
+    assert "fake-first-key" not in json.dumps(first.list_models())
+
+
+@pytest.mark.parametrize("url", ["http://remote.invalid/v1", "https://fake-key@remote.invalid/v1",
+                                 "https://remote.invalid/v1?key=fake-key", "https://remote.invalid",
+                                 "https://remote.invalid/fake-key/v1"])
+def test_credential_transport_rejects_insecure_or_url_credentials(url):
+    with pytest.raises((ValueError, ModelError)):
+        OllamaClient(Settings(base_url=url, model="fixture"), api_key="fake-key").list_models()
+
+
+@pytest.mark.parametrize("status,hint", [(401, "API"), (404, "模型"), (429, "17"), (530, "入口"), (302, "重新導向")])
+def test_safe_actionable_errors_and_retry_after(model_server, status, hint):
+    import traceback
+    url, state = model_server
+    state.update(status=status, retry_after="17", body={"secret": "fake-key " + url})
+    client = OllamaClient(Settings(base_url=url, model="fixture"), api_key="fake-key")
+    with pytest.raises(ModelError, match=hint) as error:
+        client.complete([])
+    rendered = "".join(traceback.format_exception(error.value))
+    assert "fake-key" not in rendered and url not in rendered
+
+
+def test_timeout_and_expired_endpoint_hide_network_details(monkeypatch):
+    import socket
+    import traceback
+    from urllib.error import URLError
+    import tronclass.llm
+    class Opener:
+        def open(self, *args, **kwargs):
+            raise failure
+    monkeypatch.setattr(tronclass.llm, "build_opener", lambda *args: Opener())
+    client = OllamaClient(Settings(base_url="https://private-fixture.invalid/v1"), api_key="fake-key")
+    for failure, hint in [(socket.timeout("fake-key"), "逾時"),
+                          (URLError("https://private-fixture.invalid/v1 fake-key"), "入口")]:
+        with pytest.raises(ModelError, match=hint) as error:
+            client.list_models()
+        rendered = "".join(traceback.format_exception(error.value))
+        assert "fake-key" not in rendered and "private-fixture" not in rendered
+
+
+@pytest.mark.parametrize("value,expected", [(None, "稍候"), ("fake-key https://private.invalid", "稍候"),
+                                           ("Wed, 01 Jan 2020 00:00:00 GMT", "0 秒")])
+def test_retry_after_parsing_never_echoes_untrusted_header(value, expected):
+    from tronclass.llm import retry_hint
+    hint = retry_hint(value)
+    assert expected in hint
+    assert "fake-key" not in hint and "private.invalid" not in hint

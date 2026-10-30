@@ -14,7 +14,7 @@ def test_chat_and_data_ui_share_backend_and_show_verification_state(monkeypatch)
             return AnswerResult("介面測試回答", "fixture", 0.01, "data-hash", "prompt-hash")
 
     monkeypatch.setenv("OLLAMA_MODEL", "fixture")
-    monkeypatch.setattr(tronclass.factory, "create_backend", lambda settings: Backend())
+    monkeypatch.setattr(tronclass.factory, "create_backend", lambda settings, **kwargs: Backend())
     app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=15).run()
     assert not app.exception
     assert [metric.value for metric in app.metric] == ["4", "10", "14"]
