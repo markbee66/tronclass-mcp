@@ -5,7 +5,7 @@ from tronclass.contracts import AssistantBackend
 from tronclass.system1 import System1Assistant
 
 
-def create_backend(settings: Settings, name: str = "system1") -> AssistantBackend:
+def create_backend(settings: Settings, name: str = "system1", *, client=None) -> AssistantBackend:
     if name == "system1":
-        return System1Assistant(settings)
+        return System1Assistant(settings, client=client)
     raise ValueError(f"尚未實作此 backend：{name}")

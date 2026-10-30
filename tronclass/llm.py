@@ -4,10 +4,14 @@ import json
 import os
 import socket
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
 from urllib.error import HTTPError, URLError
+from urllib.parse import unquote, urlparse
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from tronclass.config import Settings, cloudflare_token
+from tronclass.export_privacy import redact_connection
 
 
 class ModelError(RuntimeError):
@@ -24,6 +28,38 @@ class Completion:
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
         return None
+
+
+def retry_hint(value):
+    """Only render parsed durations, never an untrusted header verbatim."""
+    try:
+        seconds = int(value) if value and value.isascii() and value.isdecimal() else None
+        if seconds is None:
+            seconds = max(0, int((parsedate_to_datetime(value) - datetime.now(timezone.utc)).total_seconds()))
+        return f"請等待 {seconds} 秒後再試。"
+    except (TypeError, ValueError, OverflowError):
+        return "請稍候再試。"
+
+
+def validate_ollama_connection(base_url, api_key=""):
+    """Validate before sending credentials or constructing public UI Settings."""
+    try:
+        url = urlparse(base_url)
+        valid = (url.scheme in {"http", "https"} and url.hostname and not url.query
+                 and not url.fragment and url.username is None and url.password is None)
+        url.port  # Reject malformed ports without echoing the supplied URL.
+    except ValueError:
+        valid = False
+    if not valid:
+        raise ModelError("API base URL 需為有效 HTTP(S) 網址，不可包含帳密、金鑰或 query string。")
+    if api_key and api_key in unquote(base_url):
+        raise ModelError("API key 不可放在 URL 中，請只填入金鑰欄位。")
+    if not url.path.rstrip("/").endswith("/v1"):
+        raise ModelError("API base URL 需包含 /v1。")
+    if api_key and url.scheme != "https" and url.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        raise ModelError("含 API key 的遠端連線必須使用 HTTPS；只有 localhost 可使用 HTTP。")
+    if any(ord(char) < 33 or ord(char) > 126 for char in api_key):
+        raise ModelError("API key 格式無效，請重新貼上金鑰。")
 
 
 class HttpModelClient:
@@ -56,17 +92,27 @@ class HttpModelClient:
                 }
                 hint = hints.get(exc.code, "請確認模型、帳戶權限與 Cloudflare 服務狀態。")
                 raise ModelError(f"Cloudflare 回傳 HTTP {exc.code}。{hint}") from None
-            if exc.code == 401:
-                raise ModelError("模型服務回傳 HTTP 401，請確認 OLLAMA_API_KEY 與遠端閘道的金鑰設定。") from None
-            raise ModelError(f"模型服務回傳 HTTP {exc.code}，請確認網址與模型名稱。") from exc
+            hints = {
+                401: "請確認 API key（CLI 為 OLLAMA_API_KEY）是否正確。",
+                403: "請確認 API key 的存取權限。",
+                404: "請確認模型名稱存在、網址包含 /v1，或向負責人取得目前入口。",
+                429: retry_hint(exc.headers.get("Retry-After")) + "頻率限制由伺服器控制。",
+                502: "遠端入口或模型服務無法使用，請聯絡負責人。",
+                503: "服務忙碌，請等待其他請求結束後再試。",
+                530: "遠端入口已失效或離線，請向負責人取得目前入口。",
+            }
+            hint = "服務要求重新導向；為保護金鑰不會轉送，請取得正確入口。" if 300 <= exc.code < 400 else hints.get(exc.code, "請確認服務狀態與目前入口。")
+            raise ModelError(f"模型服務回傳 HTTP {exc.code}。{hint}") from None
         except (TimeoutError, socket.timeout) as exc:
-            raise ModelError("模型回應逾時，請增加 LLM_TIMEOUT_SECONDS 或確認模型執行狀況。") from exc
+            raise ModelError("模型回應逾時，請稍後重試或聯絡負責人確認模型執行狀況。") from None
         except (URLError, OSError) as exc:
             if self.settings.provider == "cloudflare":
                 raise ModelError("無法連線 Cloudflare，請確認網路與服務網址。") from None
-            raise ModelError("無法連線 Ollama。請先啟動 ollama serve，並確認服務網址。") from exc
+            if isinstance(getattr(exc, "reason", None), (TimeoutError, socket.timeout)):
+                raise ModelError("模型回應逾時，請稍後重試。") from None
+            raise ModelError("無法連線 Ollama。本機請確認 ollama serve；遠端請確認網路並向負責人取得目前入口。") from None
         except (ValueError, UnicodeError) as exc:
-            raise ModelError("模型服務回傳的內容不是有效的 JSON。") from exc
+            raise ModelError("模型服務未回傳有效 JSON，遠端入口可能失效，請確認目前入口。") from None
         if not isinstance(body, dict):
             raise ModelError("模型服務回傳格式錯誤。")
         return body
@@ -74,9 +120,17 @@ class HttpModelClient:
 
 class OllamaClient(HttpModelClient):
 
+    def __init__(self, settings: Settings, *, api_key=None):
+        super().__init__(settings)
+        # None retains CLI compatibility; an explicit empty string disables fallback.
+        self._api_key = (os.getenv("OLLAMA_API_KEY", "") if api_key is None else api_key).strip()
+
+    def redact(self, value):
+        return redact_connection(value, self.settings.base_url, self._api_key)
+
     def _headers(self):
-        # Keep the optional gateway credential out of Settings and result metadata.
-        token = os.getenv("OLLAMA_API_KEY", "").strip()
+        validate_ollama_connection(self.settings.base_url, self._api_key)
+        token = self._api_key
         return {"Authorization": f"Bearer {token}"} if token else {}
 
     def list_models(self) -> list[str]:
@@ -84,7 +138,7 @@ class OllamaClient(HttpModelClient):
         models = body.get("data")
         if not isinstance(models, list) or any(not isinstance(m, dict) or not isinstance(m.get("id"), str) for m in models):
             raise ModelError("模型清單格式錯誤。")
-        return sorted(m["id"] for m in models)
+        return sorted(self.redact(m["id"]) for m in models)
 
     def complete(self, messages: list[dict[str, str]]) -> Completion:
         if not self.settings.model.strip():
@@ -102,18 +156,18 @@ class OllamaClient(HttpModelClient):
             text = choice["message"]["content"]
             finish_reason = choice.get("finish_reason")
         except (KeyError, IndexError, TypeError) as exc:
-            raise ModelError("模型服務未回傳預期的 choices/message/content。") from exc
+            raise ModelError("模型服務未回傳預期的 choices/message/content。") from None
         if not isinstance(text, str) or not text.strip():
             raise ModelError("模型沒有回傳文字回答。")
         model = body.get("model", self.settings.model)
         if not isinstance(model, str):
             raise ModelError("模型名稱回傳格式錯誤。")
-        return Completion(text=text, model=model, metadata={
+        return Completion(text=self.redact(text), model=self.redact(model), metadata=self.redact({
             "response_id": body.get("id"),
             "system_fingerprint": body.get("system_fingerprint"),
             "usage": body.get("usage", {}),
             "finish_reason": finish_reason,
-        })
+        }))
 
 
 class CloudflareClaudeClient(HttpModelClient):
@@ -179,7 +233,7 @@ class CloudflareClaudeClient(HttpModelClient):
         })
 
 
-def create_model_client(settings: Settings):
+def create_model_client(settings: Settings, *, api_key=None):
     if settings.provider == "cloudflare":
         return CloudflareClaudeClient(settings)
-    return OllamaClient(settings)
+    return OllamaClient(settings, api_key=api_key)

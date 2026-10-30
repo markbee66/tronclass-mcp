@@ -6,12 +6,14 @@ from datetime import datetime, timezone
 
 import streamlit as st
 
+from tronclass import config
 from tronclass.config import Settings
 from tronclass.contracts import AnswerRequest
 from tronclass.database import CourseRepository, DataError, serialize_snapshot
 from tronclass.factory import create_backend
 from tronclass.fingerprints import sha256
-from tronclass.llm import CloudflareClaudeClient, ModelError, create_model_client
+from tronclass.export_privacy import redact_connection
+from tronclass.llm import CloudflareClaudeClient, ModelError, create_model_client, validate_ollama_connection
 
 st.set_page_config(page_title="TronClass 課業助理", page_icon="📚", layout="wide")
 
@@ -85,6 +87,30 @@ def render_data(snapshot):
         st.dataframe(display, width="stretch", hide_index=True)
 
 
+def invalidate_connection():
+    """Widget callbacks run before rerendering; no credentials enter a scope hash."""
+    st.session_state.ollama_connected = False
+    st.session_state.ollama_models = []
+    st.session_state.connection_revision = st.session_state.get("connection_revision", 0) + 1
+    st.session_state.messages = []
+    st.session_state.records = []
+    st.session_state.failed_question = None
+    st.session_state.pop("ollama_model_choice", None)
+
+
+def clear_connection():
+    invalidate_connection()
+    for key in ("remote_api_key", "base_url_ollama_remote"):
+        st.session_state[key] = ""
+
+
+def choose_model():
+    selected = st.session_state.get("ollama_model_choice")
+    if selected and selected != "手動輸入":
+        st.session_state.model_name_ollama_local = selected
+        invalidate_connection()
+
+
 def main():
     st.title("📚 TronClass 課業助理")
     st.caption("System 1 · 單一模型讀取模擬課程資料，協助查詢跨課程資訊。")
@@ -96,18 +122,53 @@ def main():
 
     with st.sidebar:
         st.header("模型設定")
-        providers = {"ollama": "Ollama（本機）", "cloudflare": "Cloudflare → Claude"}
+        providers = {"ollama": "Ollama", "cloudflare": "Cloudflare → Claude"}
         provider = st.selectbox("模型服務", list(providers), index=list(providers).index(defaults.provider),
-                                format_func=providers.get, key="model_provider")
+                                format_func=providers.get, key="model_provider", on_change=invalidate_connection)
         try:
             defaults = Settings.from_env(provider=provider)
         except (ValueError, OSError) as exc:
             st.error(f"設定有誤：{exc}")
             st.stop()
-        base_url = st.text_input("模型服務網址", value=defaults.base_url, key=f"base_url_{provider}",
-                                 disabled=provider == "cloudflare")
-        model = st.text_input("模型名稱", value=defaults.model, key=f"model_name_{provider}",
-                              placeholder="anthropic/claude-…" if provider == "cloudflare" else "填入 ollama list 的完整名稱")
+        api_key = ""  # UI never falls back to a process-wide Ollama credential.
+        remote = False
+        if provider == "ollama":
+            mode = st.selectbox("Ollama 連線方式", ["本機 Ollama", "遠端 Ollama API"],
+                                key="ollama_mode", on_change=invalidate_connection)
+            remote = mode == "遠端 Ollama API"
+            mode_key = "remote" if remote else "local"
+            st.button("清除連線／金鑰", on_click=clear_connection)
+            base_url = st.text_input("API base URL", value="" if remote else defaults.base_url,
+                                    key=f"base_url_ollama_{mode_key}", on_change=invalidate_connection,
+                                    placeholder="https://<目前入口>/v1", help="需包含 /v1；金鑰不可放在網址中。")
+            if remote:
+                api_key = st.text_input("API key", type="password", key="remote_api_key",
+                                        on_change=invalidate_connection,
+                                        help="只保留於目前 session；清除連線可移除金鑰。遠端請使用 HTTPS。")
+                model = config.REMOTE_OLLAMA_MODEL
+                st.markdown(f"模型名稱：`{model}`")
+                if st.session_state.get("remote_model_setting") != model:
+                    invalidate_connection()
+                    st.session_state.remote_model_setting = model
+            else:
+                model = st.text_input("模型名稱", value=defaults.model,
+                                      key="model_name_ollama_local", on_change=invalidate_connection,
+                                      placeholder="填入 ollama list 的完整模型名稱與 tag")
+            if not remote and st.session_state.get("ollama_models"):
+                st.selectbox("從模型清單選擇", ["手動輸入", *st.session_state.ollama_models],
+                             key="ollama_model_choice", on_change=choose_model)
+            check_connection = st.button("檢查連線")
+            if st.session_state.get("ollama_connected") and not check_connection:
+                st.success("模型服務已連線")
+                if not st.session_state.ollama_models:
+                    st.warning("服務尚未提供模型，請聯絡負責人。")
+                elif model and model not in st.session_state.ollama_models:
+                    st.warning("清單中沒有此模型名稱，請確認名稱與 tag。")
+        else:
+            base_url = st.text_input("模型服務網址", value=defaults.base_url, key="base_url_cloudflare", disabled=True)
+            model = st.text_input("模型名稱", value=defaults.model, key="model_name_cloudflare",
+                                  placeholder="anthropic/claude-…")
+            check_connection = st.button("檢查憑證")
         temperature = st.number_input("Temperature", min_value=0.0, max_value=1.0 if provider == "cloudflare" else 2.0,
                                       value=defaults.temperature, step=0.1, key=f"temperature_{provider}")
         if provider == "cloudflare":
@@ -115,8 +176,26 @@ def main():
         reference_time = st.text_input("固定情境時間", value=defaults.reference_time)
         st.caption("這是模擬資料的參考時間，非電腦目前時間。比較測試時請維持相同設定。")
 
+    connection_error = ""
+    if provider == "ollama":
+        if not base_url.strip():
+            connection_error = "請填入 API base URL，需包含 /v1。"
+        elif remote and not api_key.strip():
+            connection_error = "請填入遠端 API key。"
+        else:
+            try:
+                validate_ollama_connection(base_url.strip(), api_key.strip())
+            except ModelError as exc:
+                connection_error = str(exc)
+    if connection_error and check_connection:
+        st.sidebar.error(connection_error)
+
     try:
-        settings = replace(defaults, base_url=base_url.strip().rstrip("/"), model=model.strip(),
+        # Keep data browsing available while rejecting unsafe connection input.
+        settings_url = base_url.strip().rstrip("/")
+        if connection_error:
+            settings_url = "http://localhost:11434/v1"
+        settings = replace(defaults, base_url=settings_url, model=model.strip(),
                            temperature=temperature, reference_time=reference_time.strip())
         snapshot = CourseRepository(settings.db_path).snapshot(settings.student_id)
         prompt_hash = sha256(settings.prompt_path.read_text(encoding="utf-8"))
@@ -125,7 +204,7 @@ def main():
         st.stop()
 
     context_hash = sha256(serialize_snapshot(snapshot))
-    scope = (str(settings), context_hash, prompt_hash)
+    scope = (str(settings), context_hash, prompt_hash, st.session_state.get("connection_revision", 0))
     if st.session_state.get("conversation_scope") != scope:
         st.session_state.conversation_scope = scope
         st.session_state.messages = []
@@ -133,20 +212,23 @@ def main():
         st.session_state.failed_question = None
 
     with st.sidebar:
-        if st.button("檢查憑證" if provider == "cloudflare" else "檢查模型連線"):
+        if check_connection and not connection_error:
             try:
-                client = create_model_client(settings)
+                client = create_model_client(settings, api_key=api_key)
                 if isinstance(client, CloudflareClaudeClient):
                     client.check_credentials()
                     st.success("Cloudflare token 有效")
                     st.caption("此檢查只確認憑證有效；模型權限與額度需透過實際問答確認。")
                 else:
                     models = client.list_models()
-                    st.success("模型服務已連線")
-                    st.write(models or "服務尚未提供模型，請先安裝你們選定的模型。")
-                    if model and model not in models:
-                        st.warning("清單中沒有此模型名稱，請確認名稱與 tag。")
+                    if remote and model not in models:
+                        raise ModelError(f"遠端服務缺少指定模型 {model}，請聯絡負責人安裝或確認入口；不會改用其他模型。")
+                    st.session_state.ollama_connected = True
+                    st.session_state.ollama_models = models
+                    st.rerun()
             except ModelError as exc:
+                st.session_state.ollama_connected = False
+                st.session_state.ollama_models = []
                 st.error(str(exc))
         st.divider()
         st.success("SQLite 已連線")
@@ -167,8 +249,8 @@ def main():
         render_data(snapshot)
     with chat_tab:
         st.info("此為 System 1 原型，回答尚未經驗證 agent 查證。")
-        if not settings.model or not settings.base_url:
-            st.warning("請完成模型設定；Cloudflare 需設定帳戶 ID，Ollama 需指定已安裝模型。資料查詢可直接使用。")
+        if connection_error or not settings.model or not settings.base_url:
+            st.warning(connection_error or "請完成模型設定；Cloudflare 需設定帳戶 ID，Ollama 需指定已安裝模型。資料查詢可直接使用。")
         for message in st.session_state.messages:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
@@ -185,17 +267,22 @@ def main():
                 json.dumps(st.session_state.records, ensure_ascii=False, indent=2),
                 file_name="tronclass_conversation.json", mime="application/json",
             )
-        question = st.chat_input("例如：資料結構作業三什麼時候截止？", disabled=not bool(settings.model and settings.base_url))
-        if st.session_state.failed_question and st.button("重新送出上一題"):
+        if remote and not connection_error and not st.session_state.get("ollama_connected"):
+            st.info("請先按「檢查連線」，確認遠端服務提供指定模型。")
+        can_chat = not connection_error and bool(settings.model and settings.base_url) and (
+            not remote or st.session_state.get("ollama_connected", False))
+        question = st.chat_input("例如：資料結構作業三什麼時候截止？", disabled=not can_chat)
+        if st.session_state.failed_question and st.button("重新送出上一題", disabled=not can_chat):
             question = st.session_state.failed_question
-        if question and question.strip():
+        if can_chat and question and question.strip():
             request = AnswerRequest(question, settings.student_id, settings.reference_time,
                                     history=list(st.session_state.messages))
             with st.chat_message("user"):
                 st.markdown(question)
             try:
                 with st.spinner("正在讀取課程資料並等待模型回答…"):
-                    result = create_backend(settings).answer(request)
+                    client = create_model_client(settings, api_key=api_key)
+                    result = create_backend(settings, client=client).answer(request)
             except (ModelError, DataError, ValueError, OSError) as exc:
                 st.session_state.failed_question = question
                 st.error(str(exc))
@@ -203,10 +290,10 @@ def main():
                 st.session_state.messages.extend([
                     {"role": "user", "content": question}, {"role": "assistant", "content": result.answer},
                 ])
-                st.session_state.records.append({
+                st.session_state.records.append(redact_connection({
                     "timestamp": datetime.now(timezone.utc).isoformat(),
                     "request": asdict(request), "result": asdict(result),
-                })
+                }, settings.base_url, api_key))
                 st.session_state.failed_question = None
                 st.rerun()
 
