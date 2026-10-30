@@ -35,7 +35,7 @@ def test_model_tools_context_and_output_settings_are_forwarded_without_extra_lim
          "function": {"name": "query_courses", "arguments": "{}"}}]},
         {"role": "tool", "tool_call_id": "call1", "content": "x" * 70000}],
         "tools": [{"type": "function", "function": {"name": "query_courses", "parameters": {}}}],
-        "max_tokens": 16384, "stream": False}
+        "max_tokens": 16384, "reasoning_effort": "none", "stream": False}
     result = client.post("/v1/chat/completions", headers=AUTH, json=payload)
     assert result.status_code == 200
     assert json.loads(calls[0].content) == payload

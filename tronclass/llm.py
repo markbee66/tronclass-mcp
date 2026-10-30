@@ -18,6 +18,12 @@ class ModelError(RuntimeError):
     pass
 
 
+# Verified against Ollama's OpenAI-compatible /v1/chat/completions: "none" asks
+# for no thinking; boolean-only thinking models map other recognized efforts to
+# true. Older servers may not support this field, so "default" sends nothing.
+REASONING_EFFORT = {"default": None, "off": "none", "on": "medium"}
+
+
 @dataclass(frozen=True)
 class Completion:
     text: str
@@ -93,6 +99,7 @@ class HttpModelClient:
                 hint = hints.get(exc.code, "請確認模型、帳戶權限與 Cloudflare 服務狀態。")
                 raise ModelError(f"Cloudflare 回傳 HTTP {exc.code}。{hint}") from None
             hints = {
+                400: "服務不接受此請求參數；若已設定思考模式，請改回「模型預設」或確認 Ollama 版本支援 reasoning_effort。",
                 401: "請確認 API key（CLI 為 OLLAMA_API_KEY）是否正確。",
                 403: "請確認 API key 的存取權限。",
                 404: "請確認模型名稱存在、網址包含 /v1，或向負責人取得目前入口。",
@@ -152,10 +159,14 @@ class OllamaClient(HttpModelClient):
         }
         if self.settings.max_tokens is not None:
             payload["max_tokens"] = self.settings.max_tokens
+        effort = REASONING_EFFORT[self.settings.thinking]
+        if effort is not None:
+            payload["reasoning_effort"] = effort
         body = self._request("/chat/completions", payload, headers=self._headers())
         try:
             choice = body["choices"][0]
             text = choice["message"]["content"]
+            reasoning = choice["message"].get("reasoning")
             finish_reason = choice.get("finish_reason")
         except (KeyError, IndexError, TypeError) as exc:
             raise ModelError("模型服務未回傳預期的 choices/message/content。") from None
@@ -169,8 +180,11 @@ class OllamaClient(HttpModelClient):
         return Completion(text=self.redact(text), model=self.redact(model), metadata=self.redact({
             "response_id": body.get("id"),
             "system_fingerprint": body.get("system_fingerprint"),
-            "usage": body.get("usage", {}),
+            "usage": body.get("usage"),
             "finish_reason": finish_reason,
+            # Only the size is kept: thinking text is neither shown nor exported,
+            # and a missing field means "not reported", not "did not think".
+            "reasoning_characters": len(reasoning) if isinstance(reasoning, str) else None,
         }))
 
 
@@ -229,7 +243,7 @@ class CloudflareClaudeClient(HttpModelClient):
         stop_reason = body.get("stop_reason")
         return Completion(text="\n".join(texts), model=model, metadata={
             "response_id": body.get("id"),
-            "usage": body.get("usage", {}),
+            "usage": body.get("usage"),
             "finish_reason": "length" if stop_reason == "max_tokens" else stop_reason,
             "stop_reason": stop_reason,
             "seed_applied": False,

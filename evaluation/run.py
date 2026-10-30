@@ -16,6 +16,7 @@ from tronclass.factory import create_backend
 from tronclass.fingerprints import sha256
 from tronclass.export_privacy import connection_label, export_settings
 from tronclass.llm import ModelError
+from tronclass.system1 import is_pure_greeting
 
 
 def load_cases(path: Path):
@@ -54,7 +55,9 @@ def run_cases(backend, settings, cases, repeat, output: Path, input_fingerprints
     fields = ["run_id", "case_id", "repetition", "timestamp", "question", "expected", "category", "provider",
               "answer", "status", "error", "elapsed_seconds", "model", "requested_model", "temperature",
               "seed", "max_tokens", "connection", "reference_time", "context_sha256", "prompt_sha256",
-              "finish_reason", "human_correct", "review_notes"]
+              "finish_reason", "route", "model_called", "thinking", "preparation_seconds",
+              "model_request_seconds", "prompt_tokens", "completion_tokens", "reasoning_characters",
+              "human_correct", "review_notes"]
     failures = 0
     # Exclusive creation protects existing evidence from accidental overwrite.
     with output.open("x", encoding="utf-8") as log, csv_path.open("x", encoding="utf-8-sig", newline="") as csv_file:
@@ -83,6 +86,8 @@ def run_cases(backend, settings, cases, repeat, output: Path, input_fingerprints
                 log.flush()
                 result = record["result"] or {}
                 metadata = result.get("metadata", {})
+                timing = metadata.get("timing") or {}
+                usage = metadata.get("usage") if isinstance(metadata.get("usage"), dict) else {}
                 flat = {
                     **{k: record.get(k, "") for k in fields},
                     "question": case["question"], "expected": case.get("expected", ""),
@@ -95,6 +100,14 @@ def run_cases(backend, settings, cases, repeat, output: Path, input_fingerprints
                     "context_sha256": result.get("context_sha256", ""),
                     "prompt_sha256": result.get("prompt_sha256", ""),
                     "finish_reason": metadata.get("finish_reason", ""),
+                    # Blank means unknown or not applicable; never a measured zero.
+                    "route": metadata.get("route", ""), "model_called": metadata.get("model_called", ""),
+                    "thinking": settings.thinking,
+                    "preparation_seconds": timing.get("preparation_seconds"),
+                    "model_request_seconds": timing.get("model_request_seconds"),
+                    "prompt_tokens": usage.get("prompt_tokens"),
+                    "completion_tokens": usage.get("completion_tokens"),
+                    "reasoning_characters": metadata.get("reasoning_characters"),
                 }
                 writer.writerow(flat)
                 csv_file.flush()
@@ -122,7 +135,9 @@ def main(argv=None):
         }
         if args.dry_run:
             print(json.dumps({"cases": len(cases), "repeat": args.repeat,
-                              "calls": len(cases) * args.repeat, **hashes}, ensure_ascii=False, indent=2))
+                              "calls": len(cases) * args.repeat,
+                              "model_calls": sum(not is_pure_greeting(c["question"], c.get("history", []))
+                                                 for c in cases) * args.repeat, **hashes}, ensure_ascii=False, indent=2))
             return 0
         if not settings.model:
             raise ValueError("請先設定 OLLAMA_MODEL 或 CLOUDFLARE_MODEL，指定所選服務的模型名稱。")

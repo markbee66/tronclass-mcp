@@ -1,6 +1,6 @@
 # TronClass 課業助理：Streamlit + SQLite + Ollama / Cloudflare Claude
 
-依《期中報告討論整理：AI 語言模型系統整合》建立的 System 1 基礎程式。聊天頁與自動測試共用 `answer()`，從 SQLite 讀出目前學生可見的完整資料，再交給單一模型。公告改期、作業欄位未更新、討論區非官方資訊等情境原樣保留，供測試觀察模型表現。
+依《期中報告討論整理：AI 語言模型系統整合》建立的 System 1 基礎程式。聊天頁與自動測試共用 `answer()`，從 SQLite 讀出目前學生可見的完整資料，再交給單一模型；唯一例外是對話開頭的純寒暄，直接回覆固定招呼（見「回應延遲」）。公告改期、作業欄位未更新、討論區非官方資訊等情境原樣保留，供測試觀察模型表現。
 
 期中維持「單一 LLM + 基本 prompt + 資料」，尚未加入 MCP、RAG、Coordinator、驗證 agent 或自動更正答案。這些模組可於期末接入既有介面。
 
@@ -178,6 +178,54 @@ Cloudflare Claude 仍需要正整數 `max_tokens`，預設 2048，不接受 0。
 
 模型回報 `finish_reason=length` 時，介面會明確標示未完成；沒有可顯示回答時也會說明輸出預算問題，不把它誤報成一般空回答。不會自動重試或無限續寫。請檢查自訂預算、剩餘 context 與呼叫端 timeout，再重新提問；HTTP 逾時或 Tunnel 中斷是不同問題。
 
+### 回應延遲：寒暄快速回覆、思考模式與測量
+
+**寒暄快速回覆。** 對話第一句且整句只由固定寒暄詞組成（例如「你好」「嗨」「hello」「早安」，可夾標點或空白）時，System 1 直接回覆固定招呼，不讀取課程資料、不呼叫模型。判斷是 `tronclass/system1.py` 的 `GREETINGS` 固定詞集比對，不另外請模型分類。以下仍走原本完整流程：
+
+- 「你好，幫我算各科成績」「hello, 作業三何時截止？」等混合需求。
+- 「你好嗎」「你好像算錯了」等只是包含「你好」的句子。
+- 已有對話歷史時的任何訊息（可能指涉前文）。
+
+快速回覆的紀錄為 `route=greeting`、`model_called=false`，`usage`、`finish_reason`、模型往返時間皆為 null，不填虛構的 token 用量。其他問題的資料範圍、可查課程、模型與輸出長度設定都不變。
+
+**思考模式（Ollama）。** 左側「思考模式」可選「模型預設／關閉／開啟」；CLI 用 `OLLAMA_THINKING=default|off|on`，空白為 `default`。
+
+| 選項 | `/v1/chat/completions` 請求 |
+|---|---|
+| 模型預設（預設） | 不送任何思考參數，沿用模型設定；本專案的 qwen3 衍生模型預設會思考 |
+| 關閉 | `reasoning_effort: "none"` |
+| 開啟 | `reasoning_effort: "medium"`；只支援開／關的模型視為開啟，有分級的模型選 medium |
+
+依據 [Ollama OpenAI 相容 API](https://docs.ollama.com/api/openai-compatibility) 的 `reasoning_effort`，並已在近期版本的本機 Ollama 實測：`none` 時不再回傳思考內容。原生 `/api/chat` 的 `think` 欄位不適用於 `/v1`（實測會被忽略），也不使用其他服務的 `enable_thinking`。舊版 Ollama 可能不支援 `reasoning_effort`；若回傳 HTTP 400，介面會提示改回「模型預設」，不會自動重試。`ollama show <模型>` 可確認模型是否有 thinking 能力。Cloudflare Claude 沒有此設定。
+
+程式不靠隱藏思考文字來假裝關閉思考。只記錄服務回傳的思考內容長度 `reasoning_characters`；服務沒回傳該欄位時為 null，代表未知。選「關閉」卻仍收到思考內容時，介面會警告。思考內容不顯示、不匯出。關閉思考可能影響跨課程計算等複雜題的品質，請用相同題目比較後再決定。遠端連線時參數由閘道原樣轉送，能否生效取決於虛擬機上的 Ollama 版本，需依下方步驟在虛擬機確認。
+
+**測量欄位。** 每次回答的 metadata 記錄：
+
+- `timing.preparation_seconds`：讀取 SQLite、組 prompt。
+- `timing.model_request_seconds`：模型 HTTP 往返，包含網路／Tunnel、排隊、模型載入、prompt 處理、思考與生成；client 無法再細分，**不等於思考時間**。
+- `timing.total_seconds`，以及服務實際回傳的 `usage`、`finish_reason`、`reasoning_characters`。
+
+服務沒有提供的欄位保留 null，不自行估算。介面在回答下方顯示這些值；批次 CSV 新增 `route`、`model_called`、`thinking`、`preparation_seconds`、`model_request_seconds`、`prompt_tokens`、`completion_tokens`、`reasoning_characters`，空白代表未知或不適用。課程資料約 39,572 字元（字元數，不是 token 數）；實際 token 數以服務回傳的 `prompt_tokens` 為準。
+
+**人工效能比較。** 會實際呼叫模型，不屬於自動測試：
+
+```powershell
+$env:OLLAMA_MODEL = "tronclass-system1:latest"
+.venv\Scripts\python.exe -m evaluation.latency --thinking default off --repeat 2
+```
+
+依序比較寒暄、單科查詢、跨課程計算、多輪追問四種情境。每行 JSON 只含耗時、token 與字元數，不印網址、金鑰、回答或課程內容。遠端每次模型請求都計入每分鐘 30 次限制，請把 `--repeat` 設小。各情境共用課程資料前綴；模型仍載入時，後續請求可能沿用 Ollama 的 prompt 快取，第一個完整請求通常較慢。請重複數次，並比較相同位置的結果。
+
+在執行 Ollama 的機器上連 localhost 時可加 `--native`：改以原生 `/api/chat` 送出相同 messages（取代而非另外加送 `/v1` 請求），讀取 `load_duration`、`prompt_eval_duration`、`eval_duration`（秒）等欄位，區分模型載入、prompt 處理與生成。此選項只允許 loopback；介面與閘道都不使用、也不開放原生路由。
+
+**虛擬機負責人確認步驟。** 以下設定只在執行 Ollama 的虛擬機上有效；在組員電腦或 Streamlit 設定不代表已生效：
+
+1. 在虛擬機執行 `ollama --version` 與 `ollama show tronclass-system1:latest`，確認版本與 thinking 能力。
+2. 在虛擬機專案根目錄執行 `.venv\Scripts\python.exe -m evaluation.latency --thinking default off --native`（`OLLAMA_BASE_URL` 維持 localhost）。若 `off` 的 `thinking_characters` 仍大於 0，代表該版本不支援，請先更新 Ollama 或維持「模型預設」。
+3. 模型常駐：Ollama 預設閒置一段時間後卸載模型，下一次請求需重新載入。要延長時，在虛擬機設定 Ollama 服務的環境變數，例如 `[Environment]::SetEnvironmentVariable("OLLAMA_KEEP_ALIVE", "30m", "User")`（`-1` 為一直常駐），結束並重新啟動 Ollama，再以 `ollama ps` 確認卸載時間。常駐會持續占用 GPU 記憶體；Ollama 仍只監聽 loopback。
+4. 從組員電腦透過遠端入口執行 `evaluation.latency`（不可加 `--native`），比較兩種思考模式的 `model_request_seconds` 與 `completion_tokens`。
+
 ## 分工與擴充位置
 
 | 工作 | 檔案／入口 | 約定 |
@@ -189,6 +237,7 @@ Cloudflare Claude 仍需要正整數 `max_tokens`，預設 2048，不接受 0。
 | 後端契約 | `tronclass/contracts.py` | `AnswerRequest` / `AnswerResult` / `AssistantBackend` |
 | 後端組裝 | `tronclass/factory.py` | UI 與測試都從這裡取得 backend |
 | 批次 AI 測試 | `evaluation/run.py` | 共用 `answer()`，不依賴 UI 或 System 1 內部方法 |
+| 延遲比較 | `evaluation/latency.py` | 人工執行；四種情境 × 思考模式，只輸出耗時與 token |
 | 題目與標準答案 | `evaluation/cases.example.json` | 目前 3 題示例；留給題目負責人擴充為正式 15–20 題 |
 | 程式回歸測試 | `tests/` | 不等於 AI 正確率測試 |
 
@@ -229,6 +278,7 @@ System 2 可新增獨立 Coordinator，實作 `AssistantBackend.answer()` 後調
 | `LLM_SEED` | `42` |
 | `LLM_TIMEOUT_SECONDS` | `180` |
 | `LLM_MAX_TOKENS` | Ollama：未指定，空白／0 不送上限；Claude：`2048`，需正整數 |
+| `OLLAMA_THINKING` | `default`（不送參數）；`off`／`on` 送出 `reasoning_effort`，僅 Ollama |
 | `REFERENCE_TIME` | `2026-10-31T09:00:00+08:00` |
 
 情境時間固定於範例最新公告（10/30 20:45）之後，供重現測試，不代表實際今天。正式比較時請與資料、prompt 一起固定。資料層不另行推算截止日或判定公告優先級。
@@ -257,6 +307,7 @@ $env:OLLAMA_MODEL = "你們固定的模型名稱"
 - 問題、預期答案、題型、人工判分標準、實際回答。
 - 時間、耗時、provider、請求／回傳模型名稱、temperature、實際適用的 seed、輸出上限、連線類型（不含真實 API 網址）、情境時間。
 - 可見資料、prompt、完整 messages 的 SHA-256，以及服務回傳的 token usage／finish reason。
+- 路徑（`greeting`／`full`）、是否呼叫模型、思考模式、資料準備與模型往返秒數；寒暄題不呼叫模型，dry-run 另列 `model_calls`。
 - 執行錯誤、人工正誤欄位及備註。連線錯誤記為 error，**不算 AI 回答錯誤**。
 
 CSV 的 `human_correct`、`review_notes` 供整理 Verification Log；目前不做關鍵字自動判分，也不把 HTTP 成功當正確。請先人工標記有效回答，再以相同題目和標準比較 System 1 / System 2。
