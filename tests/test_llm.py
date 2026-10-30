@@ -84,6 +84,7 @@ def test_http_failure_reports_actionable_error(model_server):
 def test_cloudflare_messages_format_authentication_and_seed_not_sent(model_server, monkeypatch):
     url, state = model_server
     monkeypatch.setenv("CLOUDFLARE_API_TOKEN", "fake-cloudflare-token")
+    monkeypatch.setenv("OLLAMA_API_KEY", "different-ollama-key")
     state["body"] = {
         "id": "msg_fixture", "model": "claude-fixture-pinned", "stop_reason": "max_tokens",
         "content": [{"type": "thinking", "thinking": "hidden reasoning"},
@@ -135,3 +136,44 @@ def test_missing_cloudflare_token_fails_before_network_request(model_server):
     with pytest.raises(ModelError, match="CLOUDFLARE_API_TOKEN"):
         CloudflareClaudeClient(Settings(provider="cloudflare", base_url=url, model="anthropic/fixture")).complete([])
     assert not state["requests"]
+
+
+@pytest.mark.parametrize("api_key", [None, "", "  ", "fake-ollama-key", "  fake-ollama-key  "])
+def test_ollama_optional_api_key_on_models_and_completions(model_server, monkeypatch, api_key):
+    url, state = model_server
+    if api_key is not None:
+        monkeypatch.setenv("OLLAMA_API_KEY", api_key)
+    settings = Settings(base_url=url, model="fixture-model")
+    client = OllamaClient(settings)
+    client.list_models()
+    result = client.complete([{"role": "user", "content": "fixture question"}])
+    for request_headers in state["headers"]:
+        headers = {key.lower(): value for key, value in request_headers.items()}
+        if api_key and api_key.strip():
+            assert headers["authorization"] == "Bearer " + api_key.strip()
+        else:
+            assert "authorization" not in headers
+    assert "fake-ollama-key" not in repr(settings)
+    assert "fake-ollama-key" not in json.dumps(result.metadata)
+
+
+def test_ollama_unauthorized_error_explains_api_key_without_echoing_secrets(model_server, monkeypatch):
+    url, state = model_server
+    monkeypatch.setenv("OLLAMA_API_KEY", "fake-ollama-key")
+    state["status"] = 401
+    state["body"] = {"error": "do-not-log-this-body"}
+    with pytest.raises(ModelError, match="401.*OLLAMA_API_KEY") as error:
+        OllamaClient(Settings(base_url=url, model="fixture-model")).complete([])
+    assert "fake-ollama-key" not in str(error.value)
+    assert "do-not-log-this-body" not in str(error.value)
+
+
+def test_ollama_redirect_is_not_followed_with_api_key(model_server, monkeypatch):
+    url, state = model_server
+    monkeypatch.setenv("OLLAMA_API_KEY", "fake-ollama-key")
+    state["status"] = 302
+    with pytest.raises(ModelError, match="302"):
+        OllamaClient(Settings(base_url=url, model="fixture-model")).list_models()
+    assert len(state["requests"]) == 1
+    headers = {key.lower(): value for key, value in state["headers"][0].items()}
+    assert headers["authorization"] == "Bearer fake-ollama-key"

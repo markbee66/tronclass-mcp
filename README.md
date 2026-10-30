@@ -6,9 +6,9 @@
 
 ## 本次交付與 Ollama 接手
 
-已完成 Streamlit 聊天／資料查詢、SQLite 唯讀資料層、可替換的模型 adapter、批次測試入口，以及 26 項程式整合測試。實際 Ollama 模型尚未聯調；目前 Cloudflare Claude 的實測則因帳戶餘額不足回傳 HTTP 402，不代表已完成模型回答驗證。
+已完成 Streamlit 聊天／資料查詢、SQLite 唯讀資料層、可替換的模型 adapter、批次測試入口，以及程式整合測試。2026-10-30 已在學校虛擬機驗證 Ollama 模型 API 的 GPU 推論、HTTPS 連線與金鑰保護；這不代表完整課業問答正確率已驗證。目前 Cloudflare Claude 的實測則因帳戶餘額不足回傳 HTTP 402，不代表已完成模型回答驗證。
 
-Ollama 負責人可先指定已安裝模型，再啟動同一個介面；若 Ollama 位於另一台機器，修改 `OLLAMA_BASE_URL` 即可：
+Ollama 負責人可先指定已安裝模型，再啟動同一個介面；若 Ollama 位於另一台機器，設定 `OLLAMA_BASE_URL`；有金鑰保護時另設 `OLLAMA_API_KEY`，詳見下方共用模型步驟：
 
 ```powershell
 $env:LLM_PROVIDER = "ollama"
@@ -18,6 +18,57 @@ $env:OLLAMA_MODEL = "填入 ollama list 顯示的完整名稱"
 ```
 
 模型 HTTP 串接集中在 `tronclass/llm.py`，System 1 流程及基本 prompt 分別在 `tronclass/system1.py`、`prompts/system1.txt`；前端透過 `tronclass/factory.py` 呼叫共用契約。正式 AI 測試題尚需由目前 3 題示例擴充至 15–20 題，每題重複 5–10 次，並人工整理 Verification Log。
+
+## 共用學校虛擬機的 Ollama API
+
+組員在自己的電腦執行本專案，SQLite 查詢、Streamlit 介面與 Python 流程仍在組員電腦；模型推論透過 API 交給學校虛擬機的 GPU。組員不用安裝 Ollama、下載模型、安裝 Tailscale 或登入 Cloudflare。
+
+### 組員設定
+
+先取得已包含本節金鑰支援的專案版本；如果先前手動套用過 `tronclass-api-key.patch`，請先檢查自己的 diff，勿重複套用。依下方「啟動」建立 Python 3.11 以上的 `.venv` 並安裝依賴，再向虛擬機負責人私下取得三項資料：
+
+| 項目 | 範例／說明 |
+|---|---|
+| API base URL | `https://<目前入口>.trycloudflare.com/v1`，需包含 `/v1` |
+| 模型名稱 | 本次部署為 `tronclass-system1:latest`，由 `qwen3:8b` 建立，context 設為 32768 |
+| API key | 負責人提供的組員存取金鑰，不是 Cloudflare token 或 Ollama 雲端金鑰 |
+
+在專案根目錄的同一個 PowerShell 設定並啟動：
+
+```powershell
+$env:LLM_PROVIDER = "ollama"
+$env:OLLAMA_BASE_URL = "https://<目前入口>.trycloudflare.com/v1"
+$env:OLLAMA_MODEL = "tronclass-system1:latest"
+# 將金鑰貼在密碼欄，避免把它直接寫進命令歷史。
+$apiCredential = Get-Credential -UserName "api" -Message "請在密碼欄貼上組員 API key"
+$env:OLLAMA_API_KEY = $apiCredential.GetNetworkCredential().Password
+
+# 先測模型清單，成功後啟動原本的介面。
+Invoke-RestMethod "$env:OLLAMA_BASE_URL/models" -Headers @{Authorization = "Bearer $env:OLLAMA_API_KEY"}
+.venv\Scripts\python.exe -m streamlit run app.py
+```
+
+打開 `http://localhost:8501`，選擇 Ollama、按「檢查模型連線」後送出問題。這裡的 `localhost:8501` 是組員自己的介面，不是虛擬機 API。程式會在模型清單與問答請求都加上 `Authorization: Bearer ...`；金鑰只從環境讀取，不放入 `Settings`、模型 metadata 或匯出紀錄。本機無驗證的 Ollama 可以不設定此變數。
+
+即使入口使用 Cloudflare Tunnel，`LLM_PROVIDER` 仍是 `ollama`；下方「Cloudflare → Claude」是另一種由雲端模型運算、使用不同憑證與計費的服務。
+
+### 虛擬機負責人的操作與限制
+
+本次部署為 `Ollama (127.0.0.1:11434) → Caddy 金鑰閘道 (127.0.0.1:11435) → Cloudflare Tunnel`。2026-10-30 的模型 API smoke 已確認模擬問答回覆、100% GPU、32768 context、無／錯誤金鑰回傳 401、管理路徑回傳 404；沒有把這些連通性檢查當成課業答案正確率測試。
+
+- 使用本機服務資料夾的 `Start-API.ps1`／`Stop-API.ps1` 管理公開入口；這兩個管理腳本由虛擬機負責人另外保管，不包含在本專案。啟動前需有本機 Ollama；停止入口會關閉閘道與 Tunnel，保留本機 Ollama。
+- 啟動後從該服務資料夾的 `endpoint.txt` 取得目前 API base URL，從 `api-key.txt` 取得金鑰，再私下通知組員。不要把金鑰、這些本機檔案或會失效的臨時網址提交到 Git。網頁、程式與批次測試都要使用更新後的網址，並重新啟動原本的程式。
+- Quick Tunnel 可免費建立，不需帳號或網域，但重啟後網址會改、沒有 uptime 保證，且不支援 SSE；本專案使用 `stream=false`。長期固定網址需另設 named tunnel 與可用網域／子網域，網域註冊費另計。[免費入口](https://developers.cloudflare.com/workers/wrangler/commands/tunnel/)、[限制](https://developers.cloudflare.com/tunnel/get-started/quick-tunnels/)
+- 虛擬機及 Tunnel 需持續運作；目前未設定 Windows 服務或開機自動啟動。Cloudflare 只提供傳輸入口，模型仍在虛擬機運算；請求與回答會經過 Cloudflare，使用真實課程或學生資料前需符合學校與資料使用規範。
+- 閘道只接受帶金鑰的 `GET /v1/models` 與 `POST /v1/chat/completions`，不公開 Ollama 管理 API、檔案或系統命令。請求上限 2 MB、聊天同時連線上限 2、上游回應標頭等待上限 180 秒；這不是每人配額或完整 rate limiting，批次測試請避免大量並行。
+
+| 症狀 | 處理方式 |
+|---|---|
+| HTTP 401 | 確認已設定正確的 `OLLAMA_API_KEY`，並從同一個 PowerShell 重啟程式；不要把金鑰貼進錯誤回報 |
+| HTTP 404 | 確認 base URL 含 `/v1`、入口未更換、模型名稱完整且存在 |
+| HTTP 502／530、DNS 錯誤或無法連線 | 請負責人檢查虛擬機、Ollama、閘道與 Tunnel，取得目前入口後重啟程式 |
+| HTTP 503 | 可能達同時連線上限，等待其他請求結束後重試 |
+| 初次載入或問答逾時 | 請負責人先完成模型暖機、檢查 GPU／context，避免多人同時重試 |
 
 ## Cloudflare → Claude
 
@@ -43,7 +94,7 @@ Cloudflare 模式每次送出 `cf-aig-skip-cache: true`，避免批次重複測�
 
 ## 啟動
 
-需要 Python 3.11 以上。使用 Ollama 時需另行安裝、啟動服務；使用 Cloudflare 時依上方設定。資料查詢頁不需要模型服務。在專案根目錄執行（PowerShell）：
+需要 Python 3.11 以上。使用本機 Ollama 時需另行安裝、啟動服務；共用遠端模型的組員依上方步驟設定即可；使用 Cloudflare 時依上方設定。資料查詢頁不需要模型服務。在專案根目錄執行（PowerShell）：
 
 ```powershell
 python -m venv .venv
@@ -118,6 +169,7 @@ System 2 可新增獨立 Coordinator，實作 `AssistantBackend.answer()` 後調
 | `LLM_PROVIDER` | `ollama`，可由本機 `[app] provider` 選為 `cloudflare` |
 | `OLLAMA_BASE_URL` | `http://localhost:11434/v1` |
 | `OLLAMA_MODEL` | 空白，需填已安裝的完整名稱 |
+| `OLLAMA_API_KEY` | 空白；遠端閘道有金鑰保護時必填，只從環境讀取，不匯出 |
 | `CLOUDFLARE_ACCOUNT_ID` | 空白，使用 Cloudflare 時必填 |
 | `CLOUDFLARE_API_TOKEN` | 只從本機設定或環境讀取，不匯出 |
 | `CLOUDFLARE_MODEL` | `anthropic/claude-haiku-4.5` |
