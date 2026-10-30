@@ -1,0 +1,460 @@
+{
+  "course_grades": [
+    {
+      "student_id": "S11200001",
+      "course_id": "C01",
+      "final_grade": null,
+      "raw_grade": null,
+      "published": false
+    },
+    {
+      "student_id": "S11200001",
+      "course_id": "C02",
+      "final_grade": null,
+      "raw_grade": null,
+      "published": false
+    },
+    {
+      "student_id": "S11200001",
+      "course_id": "C03",
+      "final_grade": null,
+      "raw_grade": null,
+      "published": false
+    },
+    {
+      "student_id": "S11200001",
+      "course_id": "C04",
+      "final_grade": null,
+      "raw_grade": null,
+      "published": false
+    }
+  ],
+  "categories": [
+    {
+      "category_id": "GC-C01-01",
+      "course_id": "C01",
+      "name": "平時作業（4 次）",
+      "weight_percent": 30.0
+    },
+    {
+      "category_id": "GC-C01-02",
+      "course_id": "C01",
+      "name": "小考（3 次）",
+      "weight_percent": 15.0
+    },
+    {
+      "category_id": "GC-C01-03",
+      "course_id": "C01",
+      "name": "期中考",
+      "weight_percent": 25.0
+    },
+    {
+      "category_id": "GC-C01-04",
+      "course_id": "C01",
+      "name": "期末考",
+      "weight_percent": 30.0
+    },
+    {
+      "category_id": "GC-C01-PRACTICE",
+      "course_id": "C01",
+      "name": "線上測驗（練習）",
+      "weight_percent": 0.0
+    },
+    {
+      "category_id": "GC-C02-01",
+      "course_id": "C02",
+      "name": "作業（3 次）",
+      "weight_percent": 30.0
+    },
+    {
+      "category_id": "GC-C02-02",
+      "course_id": "C02",
+      "name": "期中報告",
+      "weight_percent": 30.0
+    },
+    {
+      "category_id": "GC-C02-03",
+      "course_id": "C02",
+      "name": "期末考",
+      "weight_percent": 40.0
+    },
+    {
+      "category_id": "GC-C02-PRACTICE",
+      "course_id": "C02",
+      "name": "線上測驗（練習）",
+      "weight_percent": 0.0
+    },
+    {
+      "category_id": "GC-C03-01",
+      "course_id": "C03",
+      "name": "Lab 實作（共 10 次）",
+      "weight_percent": 40.0
+    },
+    {
+      "category_id": "GC-C03-02",
+      "course_id": "C03",
+      "name": "期末專題",
+      "weight_percent": 50.0
+    },
+    {
+      "category_id": "GC-C03-03",
+      "course_id": "C03",
+      "name": "出席",
+      "weight_percent": 10.0
+    },
+    {
+      "category_id": "GC-C03-PRACTICE",
+      "course_id": "C03",
+      "name": "線上測驗（練習）",
+      "weight_percent": 0.0
+    },
+    {
+      "category_id": "GC-C04-01",
+      "course_id": "C04",
+      "name": "心得報告（3 篇）",
+      "weight_percent": 45.0
+    },
+    {
+      "category_id": "GC-C04-02",
+      "course_id": "C04",
+      "name": "期末書面報告",
+      "weight_percent": 40.0
+    },
+    {
+      "category_id": "GC-C04-03",
+      "course_id": "C04",
+      "name": "課堂參與",
+      "weight_percent": 15.0
+    },
+    {
+      "category_id": "GC-C04-PRACTICE",
+      "course_id": "C04",
+      "name": "線上測驗（練習）",
+      "weight_percent": 0.0
+    }
+  ],
+  "items": [
+    {
+      "grade_item_id": "GI-C01-HW1",
+      "student_id": "S11200001",
+      "course_id": "C01",
+      "category_id": "GC-C01-01",
+      "source_type": "assignment",
+      "source_id": "C01-HW1",
+      "title": "作業一：陣列與鏈結串列",
+      "item_type": "個人作業",
+      "weight_percent": 7.5,
+      "score": 88,
+      "score_published": true,
+      "actual_score": 6.6
+    },
+    {
+      "grade_item_id": "GI-C01-HW2",
+      "student_id": "S11200001",
+      "course_id": "C01",
+      "category_id": "GC-C01-01",
+      "source_type": "assignment",
+      "source_id": "C01-HW2",
+      "title": "作業二：堆疊與佇列",
+      "item_type": "個人作業",
+      "weight_percent": 7.5,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-C01-HW3",
+      "student_id": "S11200001",
+      "course_id": "C01",
+      "category_id": "GC-C01-01",
+      "source_type": "assignment",
+      "source_id": "C01-HW3",
+      "title": "作業三：二元搜尋樹",
+      "item_type": "個人作業",
+      "weight_percent": 7.5,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-C01-HW4",
+      "student_id": "S11200001",
+      "course_id": "C01",
+      "category_id": "GC-C01-01",
+      "source_type": "assignment",
+      "source_id": "C01-HW4",
+      "title": "作業四：雜湊表",
+      "item_type": "個人作業",
+      "weight_percent": 7.5,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-Q-C01-01",
+      "student_id": "S11200001",
+      "course_id": "C01",
+      "category_id": "GC-C01-02",
+      "source_type": "quiz",
+      "source_id": "Q-C01-01",
+      "title": "小考一：堆疊與佇列",
+      "item_type": "線上測驗",
+      "weight_percent": 7.5,
+      "score": 86,
+      "score_published": true,
+      "actual_score": 6.45
+    },
+    {
+      "grade_item_id": "GI-Q-C01-02",
+      "student_id": "S11200001",
+      "course_id": "C01",
+      "category_id": "GC-C01-02",
+      "source_type": "quiz",
+      "source_id": "Q-C01-02",
+      "title": "小考二：樹與 AVL",
+      "item_type": "線上測驗",
+      "weight_percent": 7.5,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-C02-HW1",
+      "student_id": "S11200001",
+      "course_id": "C02",
+      "category_id": "GC-C02-01",
+      "source_type": "assignment",
+      "source_id": "C02-HW1",
+      "title": "作業一：敘述統計",
+      "item_type": "個人作業",
+      "weight_percent": 6.0,
+      "score": 92,
+      "score_published": true,
+      "actual_score": 5.52
+    },
+    {
+      "grade_item_id": "GI-C02-HW2",
+      "student_id": "S11200001",
+      "course_id": "C02",
+      "category_id": "GC-C02-01",
+      "source_type": "assignment",
+      "source_id": "C02-HW2",
+      "title": "作業二：機率分配",
+      "item_type": "個人作業",
+      "weight_percent": 6.0,
+      "score": 85,
+      "score_published": true,
+      "actual_score": 5.1
+    },
+    {
+      "grade_item_id": "GI-C02-HW3",
+      "student_id": "S11200001",
+      "course_id": "C02",
+      "category_id": "GC-C02-01",
+      "source_type": "assignment",
+      "source_id": "C02-HW3",
+      "title": "作業三：假設檢定",
+      "item_type": "個人作業",
+      "weight_percent": 6.0,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-C02-MID-DRAFT",
+      "student_id": "S11200001",
+      "course_id": "C02",
+      "category_id": "GC-C02-01",
+      "source_type": "assignment",
+      "source_id": "C02-MID-DRAFT",
+      "title": "期中報告初稿",
+      "item_type": "個人作業",
+      "weight_percent": 6.0,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-C02-MID-FINAL",
+      "student_id": "S11200001",
+      "course_id": "C02",
+      "category_id": "GC-C02-01",
+      "source_type": "assignment",
+      "source_id": "C02-MID-FINAL",
+      "title": "期中報告定稿",
+      "item_type": "分組作業",
+      "weight_percent": 6.0,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-Q-C02-01",
+      "student_id": "S11200001",
+      "course_id": "C02",
+      "category_id": "GC-C02-PRACTICE",
+      "source_type": "quiz",
+      "source_id": "Q-C02-01",
+      "title": "測驗：機率分配",
+      "item_type": "線上測驗",
+      "weight_percent": 0.0,
+      "score": 80,
+      "score_published": true,
+      "actual_score": 0.0
+    },
+    {
+      "grade_item_id": "GI-Q-C02-02",
+      "student_id": "S11200001",
+      "course_id": "C02",
+      "category_id": "GC-C02-PRACTICE",
+      "source_type": "quiz",
+      "source_id": "Q-C02-02",
+      "title": "測驗：假設檢定",
+      "item_type": "線上測驗",
+      "weight_percent": 0.0,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-C03-LAB5",
+      "student_id": "S11200001",
+      "course_id": "C03",
+      "category_id": "GC-C03-01",
+      "source_type": "assignment",
+      "source_id": "C03-LAB5",
+      "title": "Lab 5：表單與驗證",
+      "item_type": "個人作業",
+      "weight_percent": 20.0,
+      "score": 100,
+      "score_published": true,
+      "actual_score": 20.0
+    },
+    {
+      "grade_item_id": "GI-C03-LAB6",
+      "student_id": "S11200001",
+      "course_id": "C03",
+      "category_id": "GC-C03-01",
+      "source_type": "assignment",
+      "source_id": "C03-LAB6",
+      "title": "Lab 6：Fetch API",
+      "item_type": "個人作業",
+      "weight_percent": 20.0,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-Q-C03-01",
+      "student_id": "S11200001",
+      "course_id": "C03",
+      "category_id": "GC-C03-PRACTICE",
+      "source_type": "quiz",
+      "source_id": "Q-C03-01",
+      "title": "測驗：CSS Flexbox",
+      "item_type": "線上測驗",
+      "weight_percent": 0.0,
+      "score": 100,
+      "score_published": true,
+      "actual_score": 0.0
+    },
+    {
+      "grade_item_id": "GI-Q-C03-02",
+      "student_id": "S11200001",
+      "course_id": "C03",
+      "category_id": "GC-C03-PRACTICE",
+      "source_type": "quiz",
+      "source_id": "Q-C03-02",
+      "title": "測驗：JavaScript DOM",
+      "item_type": "線上測驗",
+      "weight_percent": 0.0,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-C03-ATT",
+      "student_id": "S11200001",
+      "course_id": "C03",
+      "category_id": "GC-C03-03",
+      "source_type": "attendance",
+      "source_id": null,
+      "title": "點名成績",
+      "item_type": "點名",
+      "weight_percent": 10.0,
+      "score": 75.0,
+      "score_published": true,
+      "actual_score": 7.5
+    },
+    {
+      "grade_item_id": "GI-C04-R1",
+      "student_id": "S11200001",
+      "course_id": "C04",
+      "category_id": "GC-C04-01",
+      "source_type": "assignment",
+      "source_id": "C04-R1",
+      "title": "心得報告一：演算法與偏見",
+      "item_type": "個人作業",
+      "weight_percent": 15.0,
+      "score": 90,
+      "score_published": true,
+      "actual_score": 13.5
+    },
+    {
+      "grade_item_id": "GI-C04-R2",
+      "student_id": "S11200001",
+      "course_id": "C04",
+      "category_id": "GC-C04-01",
+      "source_type": "assignment",
+      "source_id": "C04-R2",
+      "title": "心得報告二：監控社會",
+      "item_type": "個人作業",
+      "weight_percent": 15.0,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-C04-R3",
+      "student_id": "S11200001",
+      "course_id": "C04",
+      "category_id": "GC-C04-01",
+      "source_type": "assignment",
+      "source_id": "C04-R3",
+      "title": "心得報告三：AI 與勞動",
+      "item_type": "個人作業",
+      "weight_percent": 15.0,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    },
+    {
+      "grade_item_id": "GI-Q-C04-01",
+      "student_id": "S11200001",
+      "course_id": "C04",
+      "category_id": "GC-C04-PRACTICE",
+      "source_type": "quiz",
+      "source_id": "Q-C04-01",
+      "title": "測驗：科技倫理",
+      "item_type": "線上測驗",
+      "weight_percent": 0.0,
+      "score": 92,
+      "score_published": true,
+      "actual_score": 0.0
+    },
+    {
+      "grade_item_id": "GI-Q-C04-02",
+      "student_id": "S11200001",
+      "course_id": "C04",
+      "category_id": "GC-C04-PRACTICE",
+      "source_type": "quiz",
+      "source_id": "Q-C04-02",
+      "title": "測驗：平台治理",
+      "item_type": "線上測驗",
+      "weight_percent": 0.0,
+      "score": null,
+      "score_published": false,
+      "actual_score": null
+    }
+  ]
+}

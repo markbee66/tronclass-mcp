@@ -1,0 +1,38 @@
+[
+  {
+    "student_id": "S11200001",
+    "quiz_id": "Q-C01-01",
+    "attempt_no": 1,
+    "submitted_at": "2026-10-07 10:01",
+    "submission_method": "手動交卷",
+    "score": 86,
+    "score_published": true
+  },
+  {
+    "student_id": "S11200001",
+    "quiz_id": "Q-C02-01",
+    "attempt_no": 1,
+    "submitted_at": "2026-10-08 13:11",
+    "submission_method": "手動交卷",
+    "score": 80,
+    "score_published": true
+  },
+  {
+    "student_id": "S11200001",
+    "quiz_id": "Q-C03-01",
+    "attempt_no": 1,
+    "submitted_at": "2026-10-12 15:11",
+    "submission_method": "手動交卷",
+    "score": 100,
+    "score_published": true
+  },
+  {
+    "student_id": "S11200001",
+    "quiz_id": "Q-C04-01",
+    "attempt_no": 1,
+    "submitted_at": "2026-10-13 08:11",
+    "submission_method": "手動交卷",
+    "score": 92,
+    "score_published": true
+  }
+]

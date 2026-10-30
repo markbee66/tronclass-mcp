@@ -1,0 +1,16 @@
+{
+  "school": "示範大學（虛構）",
+  "semester": "115 學年度第 1 學期",
+  "timezone": "Asia/Taipei",
+  "week1_monday": "2026-09-07",
+  "total_weeks": 18,
+  "week_rule": "第 N 週 = 從 2026-09-07（一）起算的第 N 個星期，週一至週日",
+  "special_weeks": [
+    {"week": 9, "name": "期中考週", "start": "2026-11-02", "end": "2026-11-08"},
+    {"week": 18, "name": "期末考週", "start": "2027-01-04", "end": "2027-01-10"}
+  ],
+  "no_class_days": [
+    {"date": "2026-10-09", "weekday": "五", "reason": "國慶日補假（10/10 適逢週六）"},
+    {"date": "2026-11-11", "weekday": "三", "reason": "校慶，全校停課一天"}
+  ]
+}

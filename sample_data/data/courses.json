@@ -1,0 +1,139 @@
+[
+  {
+    "course_id": "C01",
+    "name": "資料結構",
+    "teacher": "林志明",
+    "ta": "許助教",
+    "ta_email": "ds-ta@example.edu",
+    "weekday": "三",
+    "time": "10:10-12:00",
+    "room": "理工大樓 301",
+    "grading": {
+      "平時作業（4 次）": "30%",
+      "小考（3 次）": "15%",
+      "期中考": "25%",
+      "期末考": "30%"
+    },
+    "late_policy": "除老師公告延期外，作業逾期一律不收。",
+    "submission": "TronClass 作業區線上上傳（.zip）",
+    "course_code": "1151D7402018631000",
+    "subject_code": "D740201",
+    "academic_year": "115",
+    "semester_no": "1",
+    "required_elective": "必修",
+    "credits": 3.0,
+    "department_class": "（日）資訊管理學系　二年級",
+    "course_type": "標準課程",
+    "start_date": "2026-08-01",
+    "end_date": "2027-02-01",
+    "progress_percent": 58.0,
+    "intro_zh": "介紹常見資料結構、演算法複雜度、樹、雜湊與圖論基礎，強調程式實作與問題分析。",
+    "intro_en": "Introduces fundamental data structures, complexity analysis, trees, hashing, and graph basics with hands-on implementation.",
+    "info_url": "https://example.edu/courses/C01",
+    "instructors": [
+      "林志明"
+    ]
+  },
+  {
+    "course_id": "C02",
+    "name": "統計學",
+    "teacher": "陳美玲",
+    "ta": "周助教",
+    "ta_email": "stat-ta@example.edu",
+    "weekday": "四",
+    "time": "13:40-15:30",
+    "room": "商學大樓 205",
+    "grading": {
+      "作業（3 次）": "30%",
+      "期中報告": "30%",
+      "期末考": "40%"
+    },
+    "late_policy": "遲交一天內扣 20%，超過一天不收。",
+    "submission": "TronClass 作業區線上上傳（PDF），另有公告者依公告",
+    "course_code": "1151D740202011000",
+    "subject_code": "D740202",
+    "academic_year": "115",
+    "semester_no": "1",
+    "required_elective": "必修",
+    "credits": 3.0,
+    "department_class": "（日）資訊管理學系　二年級",
+    "course_type": "標準課程",
+    "start_date": "2026-08-01",
+    "end_date": "2027-02-01",
+    "progress_percent": 61.5,
+    "intro_zh": "介紹敘述統計、機率分配、抽樣、信賴區間與假設檢定，並以公開資料進行分析。",
+    "intro_en": "Covers descriptive statistics, probability distributions, sampling, confidence intervals, and hypothesis testing with data analysis.",
+    "info_url": "https://example.edu/courses/C02",
+    "instructors": [
+      "陳美玲"
+    ]
+  },
+  {
+    "course_id": "C03",
+    "name": "網頁程式設計",
+    "teacher": "張家豪",
+    "ta": "吳助教",
+    "ta_email": "web-ta@example.edu",
+    "weekday": "一",
+    "time": "15:40-17:30",
+    "room": "資訊大樓 B1 電腦教室",
+    "grading": {
+      "Lab 實作（共 10 次）": "40%",
+      "期末專題": "50%",
+      "出席": "10%"
+    },
+    "late_policy": "Lab 逾期 24 小時內可補交，成績打八折；超過 24 小時為 0 分。",
+    "submission": "TronClass 作業區上傳 GitHub 連結",
+    "course_code": "1151D7403034317J1000",
+    "subject_code": "D740303",
+    "academic_year": "115",
+    "semester_no": "1",
+    "required_elective": "選修",
+    "credits": 3.0,
+    "department_class": "（日）資訊管理學系　三年級",
+    "course_type": "標準課程",
+    "start_date": "2026-08-01",
+    "end_date": "2027-02-01",
+    "progress_percent": 54.2,
+    "intro_zh": "以 HTML、CSS、JavaScript 與基本後端觀念完成互動式網頁實作。",
+    "intro_en": "Builds interactive web applications using HTML, CSS, JavaScript, and basic backend concepts.",
+    "info_url": "https://example.edu/courses/C03",
+    "instructors": [
+      "張家豪"
+    ]
+  },
+  {
+    "course_id": "C04",
+    "name": "通識：科技與社會",
+    "teacher": "黃雅婷",
+    "ta": "無",
+    "ta_email": null,
+    "weekday": "二",
+    "time": "08:10-10:00",
+    "room": "文學大樓 110",
+    "grading": {
+      "心得報告（3 篇）": "45%",
+      "期末書面報告": "40%",
+      "課堂參與": "15%"
+    },
+    "late_policy": "以日曆天計算，截止後每逾期一天（不足一天以一天計）扣該次成績 10%，逾期超過 3 天不予收件。",
+    "submission": "TronClass 作業區線上上傳（Word 或 PDF）",
+    "course_code": "1151DSTM8348181000",
+    "subject_code": "DSTM834818",
+    "academic_year": "115",
+    "semester_no": "1",
+    "required_elective": "選修",
+    "credits": 2.0,
+    "department_class": "（日）通識涵養課程－社會科學",
+    "course_type": "標準課程",
+    "start_date": "2026-08-01",
+    "end_date": "2027-02-01",
+    "progress_percent": 64.3,
+    "intro_zh": "從社會、倫理與政策面向討論科技如何改變日常生活與公共議題。",
+    "intro_en": "Explores how technology reshapes everyday life and public issues from social, ethical, and policy perspectives.",
+    "info_url": "https://example.edu/courses/C04",
+    "instructors": [
+      "黃雅婷"
+    ]
+  }
+]

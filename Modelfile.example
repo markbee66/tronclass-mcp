@@ -1,0 +1,5 @@
+# Replace the FROM value with the exact installed model name from ollama list.
+FROM REPLACE_WITH_INSTALLED_MODEL
+# The full visible snapshot is about 40,000 characters, plus prompt and history.
+# Confirm your selected model and hardware support this context size.
+PARAMETER num_ctx 32768

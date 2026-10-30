@@ -1,0 +1,47 @@
+[
+  {
+    "attachment_id": "F-C01-01",
+    "material_id": "M-C01-01",
+    "filename": "C01_Trees_BST.pdf",
+    "file_type": "pdf",
+    "file_size_bytes": 0,
+    "uploaded_at": "2026-10-05 09:55",
+    "local_path": "attachments/C01_Trees_BST.pdf"
+  },
+  {
+    "attachment_id": "F-C01-02",
+    "material_id": "M-C01-02",
+    "filename": "C01_AVL_Trees.pptx",
+    "file_type": "pptx",
+    "file_size_bytes": 0,
+    "uploaded_at": "2026-10-19 09:55",
+    "local_path": "attachments/C01_AVL_Trees.pptx"
+  },
+  {
+    "attachment_id": "F-C02-01",
+    "material_id": "M-C02-01",
+    "filename": "C02_Hypothesis_Testing.docx",
+    "file_type": "docx",
+    "file_size_bytes": 0,
+    "uploaded_at": "2026-10-01 12:55",
+    "local_path": "attachments/C02_Hypothesis_Testing.docx"
+  },
+  {
+    "attachment_id": "F-C03-01",
+    "material_id": "M-C03-01",
+    "filename": "C03_Flexbox.pptx",
+    "file_type": "pptx",
+    "file_size_bytes": 0,
+    "uploaded_at": "2026-10-05 14:55",
+    "local_path": "attachments/C03_Flexbox.pptx"
+  },
+  {
+    "attachment_id": "F-C04-01",
+    "material_id": "M-C04-01",
+    "filename": "C04_Technology_Society.docx",
+    "file_type": "docx",
+    "file_size_bytes": 0,
+    "uploaded_at": "2026-09-29 07:55",
+    "local_path": "attachments/C04_Technology_Society.docx"
+  }
+]

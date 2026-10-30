@@ -1,0 +1,47 @@
+[
+  {
+    "material_id": "M-C01-01",
+    "course_id": "C01",
+    "title": "Lecture: Trees and Binary Search Trees",
+    "start_at": "2026-10-05 10:00",
+    "end_at": null,
+    "completion_rule": "觀看或下載所有參考文件附件",
+    "body_text": "樹、二元樹、BST 插入刪除與走訪。"
+  },
+  {
+    "material_id": "M-C01-02",
+    "course_id": "C01",
+    "title": "Lecture: AVL Trees",
+    "start_at": "2026-10-19 10:00",
+    "end_at": null,
+    "completion_rule": "觀看或下載所有參考文件附件",
+    "body_text": "AVL 平衡因子與旋轉。"
+  },
+  {
+    "material_id": "M-C02-01",
+    "course_id": "C02",
+    "title": "Lecture: Hypothesis Testing",
+    "start_at": "2026-10-01 13:00",
+    "end_at": null,
+    "completion_rule": "觀看或下載所有參考文件附件",
+    "body_text": "虛無假設、對立假設、p-value 與顯著水準。"
+  },
+  {
+    "material_id": "M-C03-01",
+    "course_id": "C03",
+    "title": "Lecture: CSS Flexbox",
+    "start_at": "2026-10-05 15:00",
+    "end_at": null,
+    "completion_rule": "觀看或下載所有參考文件附件",
+    "body_text": "Flex container、main axis、cross axis、alignment。"
+  },
+  {
+    "material_id": "M-C04-01",
+    "course_id": "C04",
+    "title": "Reading: Technology and Society",
+    "start_at": "2026-09-29 08:00",
+    "end_at": null,
+    "completion_rule": "觀看或下載所有參考文件附件",
+    "body_text": "科技與社會、倫理責任與平台治理。"
+  }
+]

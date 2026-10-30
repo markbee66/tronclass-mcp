@@ -1,0 +1,74 @@
+[
+  {
+    "quiz_id": "Q-C01-01",
+    "course_id": "C01",
+    "title": "小考一：堆疊與佇列",
+    "open_at": "2026-10-07 09:50",
+    "close_at": "2026-10-07 10:05",
+    "unit_name": "無指定章節",
+    "max_score": 100
+  },
+  {
+    "quiz_id": "Q-C01-02",
+    "course_id": "C01",
+    "title": "小考二：樹與 AVL",
+    "open_at": "2026-11-18 09:50",
+    "close_at": "2026-11-18 10:05",
+    "unit_name": "無指定章節",
+    "max_score": 100
+  },
+  {
+    "quiz_id": "Q-C02-01",
+    "course_id": "C02",
+    "title": "測驗：機率分配",
+    "open_at": "2026-10-08 13:00",
+    "close_at": "2026-10-08 13:30",
+    "unit_name": "無指定章節",
+    "max_score": 100
+  },
+  {
+    "quiz_id": "Q-C02-02",
+    "course_id": "C02",
+    "title": "測驗：假設檢定",
+    "open_at": "2026-11-19 13:00",
+    "close_at": "2026-11-19 13:30",
+    "unit_name": "無指定章節",
+    "max_score": 100
+  },
+  {
+    "quiz_id": "Q-C03-01",
+    "course_id": "C03",
+    "title": "測驗：CSS Flexbox",
+    "open_at": "2026-10-12 15:00",
+    "close_at": "2026-10-12 15:30",
+    "unit_name": "無指定章節",
+    "max_score": 100
+  },
+  {
+    "quiz_id": "Q-C03-02",
+    "course_id": "C03",
+    "title": "測驗：JavaScript DOM",
+    "open_at": "2026-11-23 15:00",
+    "close_at": "2026-11-23 15:30",
+    "unit_name": "無指定章節",
+    "max_score": 100
+  },
+  {
+    "quiz_id": "Q-C04-01",
+    "course_id": "C04",
+    "title": "測驗：科技倫理",
+    "open_at": "2026-10-13 08:00",
+    "close_at": "2026-10-13 08:30",
+    "unit_name": "無指定章節",
+    "max_score": 100
+  },
+  {
+    "quiz_id": "Q-C04-02",
+    "course_id": "C04",
+    "title": "測驗：平台治理",
+    "open_at": "2026-11-24 08:00",
+    "close_at": "2026-11-24 08:30",
+    "unit_name": "無指定章節",
+    "max_score": 100
+  }
+]

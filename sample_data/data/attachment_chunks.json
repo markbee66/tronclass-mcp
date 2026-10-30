@@ -1,0 +1,44 @@
+[
+  {
+    "attachment_id": "F-C01-01",
+    "locator_type": "page",
+    "locator": "1",
+    "content": "Trees and Binary Search Trees. Tree terminology: root, parent, child, leaf. BST property: left subtree values are smaller and right subtree values are larger. In-order traversal of a BST visits keys in sorted order."
+  },
+  {
+    "attachment_id": "F-C01-02",
+    "locator_type": "slide",
+    "locator": "1",
+    "content": "AVL Trees. Balance factor = height(left) - height(right). Valid balance factors are -1, 0, and 1. Rotations restore balance after insertion or deletion."
+  },
+  {
+    "attachment_id": "F-C01-02",
+    "locator_type": "slide",
+    "locator": "2",
+    "content": "Rotations. LL case: right rotation. RR case: left rotation. LR and RL cases require double rotations."
+  },
+  {
+    "attachment_id": "F-C02-01",
+    "locator_type": "paragraph",
+    "locator": "1-3",
+    "content": "Hypothesis Testing. Null hypothesis H0 and alternative hypothesis H1 must be defined before the test. A p-value is compared with the significance level alpha. Do not interpret statistical significance as practical importance."
+  },
+  {
+    "attachment_id": "F-C03-01",
+    "locator_type": "slide",
+    "locator": "1",
+    "content": "CSS Flexbox. display: flex creates a flex formatting context. justify-content aligns items on the main axis. align-items aligns items on the cross axis."
+  },
+  {
+    "attachment_id": "F-C03-01",
+    "locator_type": "slide",
+    "locator": "2",
+    "content": "Common Flexbox properties include flex-direction, gap, flex-wrap, and align-content."
+  },
+  {
+    "attachment_id": "F-C04-01",
+    "locator_type": "paragraph",
+    "locator": "1-3",
+    "content": "Technology and Society. Technology shapes institutions and social behaviour. Ethical analysis should consider stakeholders, benefits, harms, and accountability. Platform governance involves rules, moderation, transparency, and user rights."
+  }
+]
