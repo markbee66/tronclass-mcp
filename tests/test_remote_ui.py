@@ -7,10 +7,60 @@ from streamlit.testing.v1 import AppTest
 
 from tests.test_llm import model_server
 from tronclass.config import ROOT
+from tronclass import config
+
+
+@pytest.fixture(autouse=True)
+def shared_remote_model(model_server):
+    _, state = model_server
+    state["models_body"] = {"data": [{"id": config.REMOTE_OLLAMA_MODEL}, {"id": "fixture-model"}]}
+    state["body"]["model"] = config.REMOTE_OLLAMA_MODEL
 
 
 def widget(app, kind, label):
     return next(item for item in getattr(app, kind) if item.label == label)
+
+
+def test_remote_model_is_read_only_and_ignores_environment(monkeypatch):
+    monkeypatch.setenv("OLLAMA_MODEL", "different-env-model")
+    app = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20).run()
+    widget(app, "selectbox", "Ollama 連線方式").select("遠端 Ollama API").run()
+    assert not any(item.label == "模型名稱" for item in app.text_input)
+    assert not any(item.label == "從模型清單選擇" for item in app.selectbox)
+    assert any("tronclass-system1:latest" in item.value for item in app.markdown)
+
+
+@pytest.mark.parametrize("available", [[], [{"id": "unrelated-model"}]])
+def test_missing_required_model_is_error_without_fallback(model_server, available):
+    url, state = model_server
+    state["models_body"] = {"data": available}
+    app = remote_app(url)
+    assert app.chat_input[0].disabled
+    app.session_state["failed_question"] = "previous question"
+    widget(app, "button", "檢查連線").click().run()
+    assert any(config.REMOTE_OLLAMA_MODEL in e.value and "缺少" in e.value for e in app.error)
+    assert not app.session_state["ollama_connected"]
+    assert app.session_state["ollama_models"] == []
+    assert app.chat_input[0].disabled
+    assert widget(app, "button", "重新送出上一題").disabled
+    assert [path for path, _ in state["requests"]] == ["/v1/models"]
+    assert not any(item.label == "從模型清單選擇" for item in app.selectbox)
+
+
+def test_developer_model_setting_is_single_source_and_invalidates_connection(model_server, monkeypatch):
+    url, state = model_server
+    app = remote_app(url)
+    widget(app, "button", "檢查連線").click().run()
+    monkeypatch.setattr(config, "REMOTE_OLLAMA_MODEL", "developer-fixture-model")
+    app.run()
+    assert not app.session_state["ollama_connected"]
+    assert app.session_state["ollama_models"] == []
+    assert app.chat_input[0].disabled
+    assert any(config.REMOTE_OLLAMA_MODEL in item.value for item in app.markdown)
+    state["models_body"] = {"data": [{"id": config.REMOTE_OLLAMA_MODEL}]}
+    widget(app, "button", "檢查連線").click().run()
+    app.chat_input[0].set_value("test").run()
+    assert state["requests"][-1][1]["model"] == config.REMOTE_OLLAMA_MODEL
 
 
 def remote_app(url, key="fake-session-a"):
@@ -18,7 +68,6 @@ def remote_app(url, key="fake-session-a"):
     widget(app, "selectbox", "Ollama 連線方式").select("遠端 Ollama API").run()
     widget(app, "text_input", "API base URL").set_value(url).run()
     widget(app, "text_input", "API key").set_value(key).run()
-    widget(app, "text_input", "模型名稱").set_value("fixture-model").run()
     assert not app.exception
     return app
 
@@ -26,17 +75,20 @@ def remote_app(url, key="fake-session-a"):
 def test_ui_check_and_chat_use_same_session_connection(model_server, monkeypatch):
     url, state = model_server
     monkeypatch.setenv("OLLAMA_API_KEY", "fake-env-must-not-be-used")
+    monkeypatch.setenv("OLLAMA_MODEL", "wrong-environment-model")
     app = remote_app(url)
+    app.session_state["model_name_ollama_remote"] = "stale-session-model"
+    app.run()
     field = widget(app, "text_input", "API key").proto
     assert field.type == field.PASSWORD
     assert state["requests"] == []  # Reruns must never query automatically.
     widget(app, "button", "檢查連線").click().run()
     assert app.session_state["ollama_connected"] is True
-    assert app.session_state["ollama_models"] == ["fixture-model"]
+    assert config.REMOTE_OLLAMA_MODEL in app.session_state["ollama_models"]
     app.chat_input[0].set_value("課程有哪些？").run()
     assert not app.exception and not app.error
     assert [path for path, _ in state["requests"]] == ["/v1/models", "/v1/chat/completions"]
-    assert state["requests"][1][1]["model"] == "fixture-model"
+    assert state["requests"][1][1]["model"] == config.REMOTE_OLLAMA_MODEL
     assert all(headers["Authorization"] == "Bearer fake-session-a" for headers in state["headers"])
     records = json.dumps(app.session_state["records"], ensure_ascii=False)
     assert "fake-session-a" not in records and url not in records
@@ -63,7 +115,7 @@ def test_sessions_are_isolated_and_clear_does_not_fall_back_to_environment(model
 def test_changes_clear_confirmation_models_and_conversation(model_server):
     url, state = model_server
     app = remote_app(url)
-    for label, value in (("API key", "fake-new-key"), ("模型名稱", "other-model"),
+    for label, value in (("API key", "fake-new-key"),
                          ("API base URL", url + "/")):
         widget(app, "button", "檢查連線").click().run()
         app.session_state["messages"] = [{"role": "assistant", "content": "old"}]
@@ -81,17 +133,15 @@ def test_changes_clear_confirmation_models_and_conversation(model_server):
 
 def test_model_picker_and_local_without_key(model_server, monkeypatch):
     url, state = model_server
-    app = remote_app(url)
-    widget(app, "text_input", "模型名稱").set_value("").run()
-    widget(app, "button", "檢查連線").click().run()
-    widget(app, "selectbox", "從模型清單選擇").select("fixture-model").run()
-    assert widget(app, "text_input", "模型名稱").value == "fixture-model"
-    assert app.session_state["ollama_models"] == []
-    assert not app.session_state["ollama_connected"]
     monkeypatch.setenv("OLLAMA_BASE_URL", url)
     monkeypatch.setenv("OLLAMA_MODEL", "fixture-model")
     monkeypatch.setenv("OLLAMA_API_KEY", "fake-env-ignored-by-ui")
     local = AppTest.from_file(str(ROOT / "app.py"), default_timeout=20).run()
+    widget(local, "button", "檢查連線").click().run()
+    widget(local, "selectbox", "從模型清單選擇").select("fixture-model").run()
+    assert widget(local, "text_input", "模型名稱").value == "fixture-model"
+    assert local.session_state["ollama_models"] == []
+    assert not local.session_state["ollama_connected"]
     widget(local, "button", "檢查連線").click().run()
     local.chat_input[0].set_value("test").run()
     assert not local.exception and not local.error
@@ -157,6 +207,7 @@ def test_upstream_echo_is_removed_from_ui_download_records(model_server, caplog)
     state["body"]["choices"][0]["message"]["content"] = "answer fake-session-a " + url
     state["body"]["usage"] = {"echo": "fake-session-a " + url}
     app = remote_app(url)
+    widget(app, "button", "檢查連線").click().run()
     app.chat_input[0].set_value("test").run()
     assert not app.exception
     exported = json.dumps(app.session_state["records"])

@@ -11,6 +11,7 @@ from urllib.parse import urlparse
 ROOT = Path(__file__).resolve().parents[1]
 SECRETS_PATH = ROOT / ".streamlit" / "secrets.toml"
 DEFAULT_CLOUDFLARE_MODEL = "anthropic/claude-haiku-4.5"
+REMOTE_OLLAMA_MODEL = "tronclass-system1:latest"
 
 
 def local_config() -> dict:

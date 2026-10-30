@@ -31,9 +31,11 @@ $env:OLLAMA_MODEL = "填入 ollama list 顯示的完整名稱"
 2. 左側「模型服務」選 **Ollama**，「Ollama 連線方式」選 **遠端 Ollama API**。底層仍使用 `provider=ollama`。
 3. 在 **API base URL** 貼上負責人提供的目前網址，必須包含 `/v1`，例如 `https://<目前入口>/v1`。遠端含金鑰連線必須使用 HTTPS；只有 localhost／loopback 可用 HTTP。網址不可包含金鑰、帳密或 query string。
 4. 在遮蔽的 **API key** 欄位輸入負責人私下提供的金鑰（公開示例：`fake-team-key-do-not-use`）。金鑰只留在目前 Streamlit session，不會存檔或修改全域環境變數；介面不會自動讀取 `OLLAMA_API_KEY`。
-5. 可先手動填入完整 **模型名稱**，或按 **檢查連線**，成功後用 **從模型清單選擇** 填入。連線檢查查詢 `/models`，不會產生模型回答；確認模型可推論仍需送出問題。畫面 rerun 不會自動查詢清單。
-6. 送出課業問題。檢查連線與問答共用目前網址、金鑰及模型設定，請求由 Python 後端發送，Quick Tunnel 使用 `stream=false`。切換網址、金鑰、模型或連線方式會清除過期連線狀態、模型清單及原對話；選取清單模型後可再按檢查連線。
-7. 使用完畢按 **清除連線／金鑰**，移除遠端網址、金鑰、模型與對話。session 結束後需重新輸入。切換到 **本機 Ollama** 可連接沒有金鑰的本機服務；原有 **Cloudflare → Claude** 仍依本機設定使用。
+5. **模型名稱** 唯讀顯示 `tronclass-system1:latest`，遠端模式沒有模型輸入框或下拉選單，一般組員只需設定 API 網址與 API key。按 **檢查連線** 後會查詢 `/models` 並確認該模型存在；不存在就顯示明確錯誤，不會改用其他模型。畫面 rerun 不會自動查詢清單。
+6. 檢查成功後送出課業問題。檢查連線與問答共用目前網址、金鑰及固定模型設定，請求由 Python 後端發送，Quick Tunnel 使用 `stream=false`。切換網址、金鑰或連線方式會清除過期連線狀態、模型清單及原對話，需重新檢查。清單存在只代表服務列出該模型，實際推論仍需送出問題驗收。
+7. 使用完畢按 **清除連線／金鑰**，移除遠端網址、金鑰與對話，唯讀模型名稱保留。session 結束後需重新輸入。切換到 **本機 Ollama** 可連接沒有金鑰的本機服務，仍可手動輸入或從模型清單選擇模型；原有 **Cloudflare → Claude** 的模型設定與憑證功能保留。
+
+遠端模型的唯一執行設定來源是 `tronclass/config.py` 的 `REMOTE_OLLAMA_MODEL`。開發者要調整部署模型時只修改此常數並重新啟動 Streamlit；介面顯示、連線檢查與問答都引用這個值，不受 `OLLAMA_MODEL` 或舊 session 模型欄位覆寫。此為介面使用設定，API 閘道不新增模型限制，仍只負責既有頻率限制及安全保護。CLI／本機 Ollama 仍可使用 `OLLAMA_MODEL`。
 
 若缺少設定，依欄位提示補齊；HTTP 401 請確認金鑰，404 請確認完整模型名稱、`/v1` 與目前入口，429 請依 `Retry-After` 提示等待，頻率限制由伺服器控制。逾時請稍後重試或聯絡負責人；入口失效／離線時取得新網址再檢查。為保護金鑰，程式不跟隨重新導向，請使用正確 API 入口。
 
@@ -61,7 +63,7 @@ $env:OLLAMA_API_KEY = $apiCredential.GetNetworkCredential().Password
 Invoke-RestMethod "$env:OLLAMA_BASE_URL/models" -Headers @{Authorization = "Bearer $env:OLLAMA_API_KEY"}
 ```
 
-以上環境設定保留給 CLI／批次評估使用；Streamlit 請依上方介面步驟輸入網址、金鑰及模型，再按「檢查連線」。`localhost:8501` 是組員自己的介面，不是虛擬機 API。程式會在模型清單與問答請求都加上 `Authorization: Bearer ...`；CLI 金鑰從環境讀取，介面金鑰由目前 session 注入，不放入 `Settings`、模型 metadata 或匯出紀錄。本機無驗證的 Ollama 不需要金鑰。
+以上環境設定保留給 CLI／批次評估使用；Streamlit 請依上方介面步驟輸入網址與金鑰，再按「檢查連線」。`localhost:8501` 是組員自己的介面，不是虛擬機 API。程式會在模型清單與問答請求都加上 `Authorization: Bearer ...`；CLI 金鑰從環境讀取，介面金鑰由目前 session 注入，不放入 `Settings`、模型 metadata 或匯出紀錄。本機無驗證的 Ollama 不需要金鑰。
 
 即使入口使用 Cloudflare Tunnel，`LLM_PROVIDER` 仍是 `ollama`；下方「Cloudflare → Claude」是另一種由雲端模型運算、使用不同憑證與計費的服務。
 
@@ -190,7 +192,7 @@ System 2 可新增獨立 Coordinator，實作 `AssistantBackend.answer()` 後調
 
 ## 設定
 
-`.env.example` 是環境變數參考，程式**不會自動讀取 `.env`**。Cloudflare 也可從上述本機 secrets.toml 讀取設定。聊天頁可切換服務、模型、temperature、情境時間；Ollama 網址可修改，Cloudflare 網址由帳戶設定產生。Ollama 模型名稱不設預設值，也不會自動下載模型。
+`.env.example` 是環境變數參考，程式**不會自動讀取 `.env`**。Cloudflare 也可從上述本機 secrets.toml 讀取設定。聊天頁可切換服務、temperature、情境時間；本機 Ollama 與 Cloudflare 可調整模型，遠端 Ollama 使用上述集中設定的唯讀模型。Ollama 網址可修改，Cloudflare 網址由帳戶設定產生。本機 Ollama 模型名稱不設預設值，程式不會自動下載模型。
 
 | 環境變數 | 預設值 |
 |---|---|

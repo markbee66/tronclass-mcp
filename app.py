@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 
 import streamlit as st
 
+from tronclass import config
 from tronclass.config import Settings
 from tronclass.contracts import AnswerRequest
 from tronclass.database import CourseRepository, DataError, serialize_snapshot
@@ -99,15 +100,14 @@ def invalidate_connection():
 
 def clear_connection():
     invalidate_connection()
-    for key in ("remote_api_key", "base_url_ollama_remote", "model_name_ollama_remote"):
+    for key in ("remote_api_key", "base_url_ollama_remote"):
         st.session_state[key] = ""
 
 
 def choose_model():
     selected = st.session_state.get("ollama_model_choice")
     if selected and selected != "手動輸入":
-        mode = "remote" if st.session_state.ollama_mode == "遠端 Ollama API" else "local"
-        st.session_state[f"model_name_ollama_{mode}"] = selected
+        st.session_state.model_name_ollama_local = selected
         invalidate_connection()
 
 
@@ -145,10 +145,16 @@ def main():
                 api_key = st.text_input("API key", type="password", key="remote_api_key",
                                         on_change=invalidate_connection,
                                         help="只保留於目前 session；清除連線可移除金鑰。遠端請使用 HTTPS。")
-            model = st.text_input("模型名稱", value=defaults.model,
-                                  key=f"model_name_ollama_{mode_key}", on_change=invalidate_connection,
-                                  placeholder="填入負責人提供的完整模型名稱與 tag")
-            if st.session_state.get("ollama_models"):
+                model = config.REMOTE_OLLAMA_MODEL
+                st.markdown(f"模型名稱：`{model}`")
+                if st.session_state.get("remote_model_setting") != model:
+                    invalidate_connection()
+                    st.session_state.remote_model_setting = model
+            else:
+                model = st.text_input("模型名稱", value=defaults.model,
+                                      key="model_name_ollama_local", on_change=invalidate_connection,
+                                      placeholder="填入 ollama list 的完整模型名稱與 tag")
+            if not remote and st.session_state.get("ollama_models"):
                 st.selectbox("從模型清單選擇", ["手動輸入", *st.session_state.ollama_models],
                              key="ollama_model_choice", on_change=choose_model)
             check_connection = st.button("檢查連線")
@@ -215,6 +221,8 @@ def main():
                     st.caption("此檢查只確認憑證有效；模型權限與額度需透過實際問答確認。")
                 else:
                     models = client.list_models()
+                    if remote and model not in models:
+                        raise ModelError(f"遠端服務缺少指定模型 {model}，請聯絡負責人安裝或確認入口；不會改用其他模型。")
                     st.session_state.ollama_connected = True
                     st.session_state.ollama_models = models
                     st.rerun()
@@ -259,10 +267,14 @@ def main():
                 json.dumps(st.session_state.records, ensure_ascii=False, indent=2),
                 file_name="tronclass_conversation.json", mime="application/json",
             )
-        question = st.chat_input("例如：資料結構作業三什麼時候截止？", disabled=bool(connection_error) or not bool(settings.model and settings.base_url))
-        if st.session_state.failed_question and st.button("重新送出上一題"):
+        if remote and not connection_error and not st.session_state.get("ollama_connected"):
+            st.info("請先按「檢查連線」，確認遠端服務提供指定模型。")
+        can_chat = not connection_error and bool(settings.model and settings.base_url) and (
+            not remote or st.session_state.get("ollama_connected", False))
+        question = st.chat_input("例如：資料結構作業三什麼時候截止？", disabled=not can_chat)
+        if st.session_state.failed_question and st.button("重新送出上一題", disabled=not can_chat):
             question = st.session_state.failed_question
-        if question and question.strip():
+        if can_chat and question and question.strip():
             request = AnswerRequest(question, settings.student_id, settings.reference_time,
                                     history=list(st.session_state.messages))
             with st.chat_message("user"):
