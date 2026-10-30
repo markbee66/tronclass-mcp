@@ -51,7 +51,7 @@ class Settings:
     temperature: float = 0.0
     seed: int = 42
     timeout_seconds: float = 180.0
-    max_tokens: int = 2048
+    max_tokens: int | None = None
     reference_time: str = "2026-10-31T09:00:00+08:00"
     prompt_path: Path = ROOT / "prompts" / "system1.txt"
     provider: str = "ollama"
@@ -82,8 +82,10 @@ class Settings:
             raise ValueError("情境時間需包含時區，例如 2026-10-31T09:00:00+08:00")
         if not 0 <= self.temperature <= 2:
             raise ValueError("temperature 必須介於 0 到 2。")
-        if self.timeout_seconds <= 0 or self.max_tokens < 1:
-            raise ValueError("逾時秒數與最大輸出 token 數必須大於零。")
+        if self.provider == "cloudflare" and self.max_tokens is None:
+            object.__setattr__(self, "max_tokens", 2048)
+        if self.timeout_seconds <= 0 or (self.max_tokens is not None and self.max_tokens < 1):
+            raise ValueError("逾時秒數與自訂最大輸出 token 數必須大於零。")
 
     @classmethod
     def from_env(cls, provider=None):
@@ -95,6 +97,8 @@ class Settings:
         else:
             base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434/v1").rstrip("/")
             model = os.getenv("OLLAMA_MODEL", "").strip()
+        raw_budget = os.getenv("LLM_MAX_TOKENS", "").strip()
+        max_tokens = None if provider == "ollama" and raw_budget in {"", "0"} else int(raw_budget or "2048")
         path = Path(os.getenv("TRONCLASS_DB_PATH", "sample_data/course.db")).expanduser()
         return cls(
             db_path=(ROOT / path).resolve() if not path.is_absolute() else path.resolve(),
@@ -107,6 +111,6 @@ class Settings:
             temperature=float(os.getenv("LLM_TEMPERATURE", "0")),
             seed=int(os.getenv("LLM_SEED", "42")),
             timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "180")),
-            max_tokens=int(os.getenv("LLM_MAX_TOKENS", "2048")),
+            max_tokens=max_tokens,
             reference_time=os.getenv("REFERENCE_TIME", "2026-10-31T09:00:00+08:00"),
         )

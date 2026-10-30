@@ -143,14 +143,16 @@ class OllamaClient(HttpModelClient):
     def complete(self, messages: list[dict[str, str]]) -> Completion:
         if not self.settings.model.strip():
             raise ModelError("請填入 ollama list 顯示的完整模型名稱。")
-        body = self._request("/chat/completions", {
+        payload = {
             "model": self.settings.model,
             "messages": messages,
             "temperature": self.settings.temperature,
             "seed": self.settings.seed,
-            "max_tokens": self.settings.max_tokens,
             "stream": False,
-        }, headers=self._headers())
+        }
+        if self.settings.max_tokens is not None:
+            payload["max_tokens"] = self.settings.max_tokens
+        body = self._request("/chat/completions", payload, headers=self._headers())
         try:
             choice = body["choices"][0]
             text = choice["message"]["content"]
@@ -158,6 +160,8 @@ class OllamaClient(HttpModelClient):
         except (KeyError, IndexError, TypeError) as exc:
             raise ModelError("模型服務未回傳預期的 choices/message/content。") from None
         if not isinstance(text, str) or not text.strip():
+            if finish_reason == "length":
+                raise ModelError("模型已耗盡輸出預算，但尚未產生可顯示的回答；請取消或提高自訂上限，並檢查模型上下文容量。")
             raise ModelError("模型沒有回傳文字回答。")
         model = body.get("model", self.settings.model)
         if not isinstance(model, str):

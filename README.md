@@ -157,7 +157,26 @@ ollama create tronclass-system1 -f Modelfile.example
 $env:OLLAMA_MODEL = "tronclass-system1"
 ```
 
-長對話也要確認剩餘 context；程式不會自行裁切歷史。輸出達長度上限時，介面會提示，執行紀錄保留 `finish_reason`。
+長對話也要確認剩餘 context；程式不會自行裁切歷史。輸入、歷史、思考與回答需要共用模型可用的上下文；關閉 client 上限不代表模型有無限容量。
+
+### Ollama 回答長度
+
+Ollama 預設不勾選「自訂輸出長度上限」，請求不會送出 `max_tokens`，避免原本固定 2048 token 在長回答中途截斷。模型依自己的設定及停止條件完成回答；不修改 gateway 的每分鐘頻率限制、模型名稱或 Cloudflare Claude 流程。
+
+需要可重現的有限輸出預算時，勾選「自訂輸出長度上限」並填入正整數。若原先環境有 `LLM_MAX_TOKENS=2048`，介面仍會載入這項明確設定；取消勾選即可不再送出該上限。設定改變時，沿用既有規則重開對話。
+
+CLI／批次測試可用：
+
+```powershell
+# Ollama：空白或 0 代表不額外指定輸出上限；仍受模型與連線限制。
+$env:LLM_MAX_TOKENS = "0"
+# 如需明確預算，可改成正整數，例如：
+# $env:LLM_MAX_TOKENS = "8192"
+```
+
+Cloudflare Claude 仍需要正整數 `max_tokens`，預設 2048，不接受 0。Ollama 未指定上限時，匯出 `max_tokens` 為 JSON null／CSV 空值，表示 client 沒有送出這個參數。
+
+模型回報 `finish_reason=length` 時，介面會明確標示未完成；沒有可顯示回答時也會說明輸出預算問題，不把它誤報成一般空回答。不會自動重試或無限續寫。請檢查自訂預算、剩餘 context 與呼叫端 timeout，再重新提問；HTTP 逾時或 Tunnel 中斷是不同問題。
 
 ## 分工與擴充位置
 
@@ -209,7 +228,7 @@ System 2 可新增獨立 Coordinator，實作 `AssistantBackend.answer()` 後調
 | `LLM_TEMPERATURE` | `0` |
 | `LLM_SEED` | `42` |
 | `LLM_TIMEOUT_SECONDS` | `180` |
-| `LLM_MAX_TOKENS` | `2048` |
+| `LLM_MAX_TOKENS` | Ollama：未指定，空白／0 不送上限；Claude：`2048`，需正整數 |
 | `REFERENCE_TIME` | `2026-10-31T09:00:00+08:00` |
 
 情境時間固定於範例最新公告（10/30 20:45）之後，供重現測試，不代表實際今天。正式比較時請與資料、prompt 一起固定。資料層不另行推算截止日或判定公告優先級。
