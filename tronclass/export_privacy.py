@@ -33,6 +33,7 @@ def export_settings(settings):
         "provider": settings.provider, "model": settings.model,
         "temperature": settings.temperature, "seed": settings.seed,
         "timeout_seconds": settings.timeout_seconds, "max_tokens": settings.max_tokens,
+        "thinking": settings.thinking,
         "reference_time": settings.reference_time, "student_id": settings.student_id,
         "db_path": settings.db_path.name, "prompt_path": settings.prompt_path.name,
         "connection": connection_label(settings.base_url),

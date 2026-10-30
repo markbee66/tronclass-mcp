@@ -37,6 +37,7 @@ SECTIONS = {
     "討論區（非官方）": "discussions",
     "停課日": "no_class_days",
 }
+THINKING_LABELS = {"default": "模型預設", "off": "關閉", "on": "開啟"}
 COLUMN_NAMES = {
     "course_id": "課程編號", "name": "名稱", "title": "標題", "content": "內容",
     "announcement_id": "公告編號", "posted_at": "發布時間", "author": "發布人",
@@ -85,6 +86,23 @@ def render_data(snapshot):
     else:
         display = [{COLUMN_NAMES.get(k, k): v for k, v in row.items() if k != "local_path"} for row in rows]
         st.dataframe(display, width="stretch", hide_index=True)
+
+
+def run_summary(result):
+    """Show only measured values; fields the service did not report stay unknown."""
+    meta = result["metadata"]
+    timing = meta.get("timing") or {}
+    if meta.get("model_called") is False:
+        return f"未呼叫模型 · 寒暄快速回覆，未讀取課程資料 · 總計 {result['elapsed_seconds']:.2f} 秒"
+    parts = [result["model"], f"總計 {result['elapsed_seconds']:.2f} 秒"]
+    if timing.get("model_request_seconds") is not None:
+        parts += [f"資料準備 {timing['preparation_seconds']:.2f} 秒", f"模型往返 {timing['model_request_seconds']:.2f} 秒"]
+    usage = meta.get("usage")
+    if isinstance(usage, dict) and usage.get("prompt_tokens") is not None:
+        parts.append(f"輸入 {usage['prompt_tokens']} / 輸出 {usage.get('completion_tokens', '未知')} token")
+    elif "usage" in meta:
+        parts.append("token 用量未提供")
+    return " · ".join([*parts, result["verification"]])
 
 
 def invalidate_connection():
@@ -180,6 +198,11 @@ def main():
             max_tokens = int(st.number_input("最大輸出 token", min_value=1,
                 value=defaults.max_tokens or 8192, step=1024, key="max_tokens_ollama")) if limit_output else None
             st.caption("未勾選時由模型決定輸出長度；仍受模型上下文及連線服務限制。")
+        thinking = "default"
+        if provider == "ollama":
+            thinking = st.selectbox("思考模式", list(THINKING_LABELS), format_func=THINKING_LABELS.get,
+                                    index=list(THINKING_LABELS).index(defaults.thinking), key="thinking_ollama")
+            st.caption("模型預設不送出設定；關閉／開啟透過 reasoning_effort（none／medium）要求，需 Ollama 版本與模型支援。")
         reference_time = st.text_input("固定情境時間", value=defaults.reference_time)
         st.caption("這是模擬資料的參考時間，非電腦目前時間。比較測試時請維持相同設定。")
 
@@ -203,7 +226,7 @@ def main():
         if connection_error:
             settings_url = "http://localhost:11434/v1"
         settings = replace(defaults, base_url=settings_url, model=model.strip(),
-                           temperature=temperature, max_tokens=max_tokens, reference_time=reference_time.strip())
+                           temperature=temperature, max_tokens=max_tokens, thinking=thinking, reference_time=reference_time.strip())
         snapshot = CourseRepository(settings.db_path).snapshot(settings.student_id)
         prompt_hash = sha256(settings.prompt_path.read_text(encoding="utf-8"))
     except (DataError, ValueError, OSError) as exc:
@@ -263,7 +286,10 @@ def main():
                 st.markdown(message["content"])
         if st.session_state.records:
             latest = st.session_state.records[-1]["result"]
-            st.caption(f"{latest['model']} · {latest['elapsed_seconds']:.2f} 秒 · {latest['verification']}")
+            st.caption(run_summary(latest))
+            meta = latest["metadata"]
+            if meta.get("thinking") == "off" and meta.get("reasoning_characters"):
+                st.warning("已要求關閉思考，但服務仍回傳思考內容；目前 Ollama 版本或模型可能不支援此設定。")
             if latest["metadata"].get("finish_reason") == "length":
                 st.warning("模型回報回答未完成（length）。請取消或提高自訂輸出上限，並檢查剩餘上下文；調整後重新提問。此狀況已記錄於匯出結果。")
             if latest["sources"] or latest["tool_calls"]:

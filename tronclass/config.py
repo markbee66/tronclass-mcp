@@ -12,6 +12,9 @@ ROOT = Path(__file__).resolve().parents[1]
 SECRETS_PATH = ROOT / ".streamlit" / "secrets.toml"
 DEFAULT_CLOUDFLARE_MODEL = "anthropic/claude-haiku-4.5"
 REMOTE_OLLAMA_MODEL = "tronclass-system1:latest"
+# Ollama /v1/chat/completions thinking control. "default" sends nothing, so the
+# model's own setting applies; native /api/chat "think" is not used on /v1.
+THINKING_MODES = ("default", "off", "on")
 
 
 def local_config() -> dict:
@@ -57,10 +60,15 @@ class Settings:
     provider: str = "ollama"
     cloudflare_account_id: str = ""
     cloudflare_gateway_id: str = ""
+    thinking: str = "default"
 
     def __post_init__(self):
         if self.provider not in {"ollama", "cloudflare"}:
             raise ValueError("LLM_PROVIDER 需為 ollama 或 cloudflare。")
+        if self.thinking not in THINKING_MODES:
+            raise ValueError("OLLAMA_THINKING 需為 default、off 或 on。")
+        if self.provider == "cloudflare" and self.thinking != "default":
+            raise ValueError("思考模式設定只適用於 Ollama。")
         url = urlparse(self.base_url)
         if self.base_url and (url.scheme not in {"http", "https"} or not url.netloc or url.query or url.fragment or url.username or url.password):
             raise ValueError("模型網址需為 http(s) 網址，例如 http://localhost:11434/v1")
@@ -99,6 +107,7 @@ class Settings:
             model = os.getenv("OLLAMA_MODEL", "").strip()
         raw_budget = os.getenv("LLM_MAX_TOKENS", "").strip()
         max_tokens = None if provider == "ollama" and raw_budget in {"", "0"} else int(raw_budget or "2048")
+        thinking = (os.getenv("OLLAMA_THINKING", "").strip().lower() or "default") if provider == "ollama" else "default"
         path = Path(os.getenv("TRONCLASS_DB_PATH", "sample_data/course.db")).expanduser()
         return cls(
             db_path=(ROOT / path).resolve() if not path.is_absolute() else path.resolve(),
@@ -112,5 +121,6 @@ class Settings:
             seed=int(os.getenv("LLM_SEED", "42")),
             timeout_seconds=float(os.getenv("LLM_TIMEOUT_SECONDS", "180")),
             max_tokens=max_tokens,
+            thinking=thinking,
             reference_time=os.getenv("REFERENCE_TIME", "2026-10-31T09:00:00+08:00"),
         )
