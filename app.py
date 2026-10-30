@@ -173,6 +173,13 @@ def main():
                                       value=defaults.temperature, step=0.1, key=f"temperature_{provider}")
         if provider == "cloudflare":
             st.caption("金鑰從本機設定讀取。問答會使用 Cloudflare 帳戶額度；Claude 模式不使用 seed。")
+        max_tokens = defaults.max_tokens
+        if provider == "ollama":
+            limit_output = st.checkbox("自訂輸出長度上限", value=defaults.max_tokens is not None,
+                                       key="limit_output_ollama")
+            max_tokens = int(st.number_input("最大輸出 token", min_value=1,
+                value=defaults.max_tokens or 8192, step=1024, key="max_tokens_ollama")) if limit_output else None
+            st.caption("未勾選時由模型決定輸出長度；仍受模型上下文及連線服務限制。")
         reference_time = st.text_input("固定情境時間", value=defaults.reference_time)
         st.caption("這是模擬資料的參考時間，非電腦目前時間。比較測試時請維持相同設定。")
 
@@ -196,7 +203,7 @@ def main():
         if connection_error:
             settings_url = "http://localhost:11434/v1"
         settings = replace(defaults, base_url=settings_url, model=model.strip(),
-                           temperature=temperature, reference_time=reference_time.strip())
+                           temperature=temperature, max_tokens=max_tokens, reference_time=reference_time.strip())
         snapshot = CourseRepository(settings.db_path).snapshot(settings.student_id)
         prompt_hash = sha256(settings.prompt_path.read_text(encoding="utf-8"))
     except (DataError, ValueError, OSError) as exc:
@@ -258,7 +265,7 @@ def main():
             latest = st.session_state.records[-1]["result"]
             st.caption(f"{latest['model']} · {latest['elapsed_seconds']:.2f} 秒 · {latest['verification']}")
             if latest["metadata"].get("finish_reason") == "length":
-                st.warning("此回答達到輸出長度上限，可能尚未完整。此狀況已記錄於匯出結果。")
+                st.warning("模型回報回答未完成（length）。請取消或提高自訂輸出上限，並檢查剩餘上下文；調整後重新提問。此狀況已記錄於匯出結果。")
             if latest["sources"] or latest["tool_calls"]:
                 with st.expander("來源與工具紀錄"):
                     st.json({"sources": latest["sources"], "tool_calls": latest["tool_calls"]})

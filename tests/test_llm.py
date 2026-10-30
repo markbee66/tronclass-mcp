@@ -58,7 +58,7 @@ def model_server():
 
 def test_openai_compatible_ollama_wire_format_and_generation_settings(model_server):
     url, state = model_server
-    client = OllamaClient(Settings(base_url=url, model="fixture-model"))
+    client = OllamaClient(Settings(base_url=url, model="fixture-model", max_tokens=2048))
     assert client.list_models() == ["fixture-model"]
     messages = [{"role": "user", "content": "中文問題"}]
     result = client.complete(messages)
