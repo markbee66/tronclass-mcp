@@ -14,6 +14,7 @@ from tronclass.contracts import AnswerRequest
 from tronclass.database import CourseRepository, DataError, serialize_snapshot
 from tronclass.factory import create_backend
 from tronclass.fingerprints import sha256
+from tronclass.export_privacy import connection_label, export_settings
 from tronclass.llm import ModelError
 
 
@@ -52,7 +53,7 @@ def run_cases(backend, settings, cases, repeat, output: Path, input_fingerprints
         raise FileExistsError(f"輸出已存在，請指定新的檔名：{output} / {csv_path}")
     fields = ["run_id", "case_id", "repetition", "timestamp", "question", "expected", "category", "provider",
               "answer", "status", "error", "elapsed_seconds", "model", "requested_model", "temperature",
-              "seed", "max_tokens", "base_url", "reference_time", "context_sha256", "prompt_sha256",
+              "seed", "max_tokens", "connection", "reference_time", "context_sha256", "prompt_sha256",
               "finish_reason", "human_correct", "review_notes"]
     failures = 0
     # Exclusive creation protects existing evidence from accidental overwrite.
@@ -66,7 +67,7 @@ def run_cases(backend, settings, cases, repeat, output: Path, input_fingerprints
                 record = {
                     "run_id": run_id, "case_id": case["id"], "repetition": repetition,
                     "timestamp": datetime.now(timezone.utc).isoformat(), "case": case, "request": asdict(request),
-                    "settings": {**asdict(settings), "db_path": str(settings.db_path), "prompt_path": str(settings.prompt_path)},
+                    "settings": export_settings(settings),
                     "human_correct": None, "review_notes": "", "status": "ok", "error": "", "result": None,
                     "initial_input_fingerprints": input_fingerprints or {},
                 }
@@ -90,7 +91,7 @@ def run_cases(backend, settings, cases, repeat, output: Path, input_fingerprints
                     "provider": settings.provider,
                     "temperature": settings.temperature, "seed": settings.seed if settings.provider == "ollama" else None,
                     "max_tokens": settings.max_tokens,
-                    "base_url": settings.base_url, "reference_time": settings.reference_time,
+                    "connection": connection_label(settings.base_url), "reference_time": settings.reference_time,
                     "context_sha256": result.get("context_sha256", ""),
                     "prompt_sha256": result.get("prompt_sha256", ""),
                     "finish_reason": metadata.get("finish_reason", ""),

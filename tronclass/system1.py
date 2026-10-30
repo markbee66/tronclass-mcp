@@ -6,6 +6,7 @@ from tronclass.config import Settings
 from tronclass.contracts import AnswerRequest, AnswerResult
 from tronclass.database import CourseRepository, serialize_snapshot
 from tronclass.fingerprints import sha256
+from tronclass.export_privacy import connection_label
 from tronclass.llm import create_model_client
 
 
@@ -50,7 +51,7 @@ class System1Assistant:
                 "temperature": self.settings.temperature,
                 "seed": self.settings.seed if self.settings.provider == "ollama" else None,
                 "max_tokens": self.settings.max_tokens,
-                "base_url": self.settings.base_url,
+                "connection": connection_label(self.settings.base_url),
                 "reference_time": request.reference_time,
                 "student_id": request.student_id,
                 "messages_sha256": sha256(serialize_snapshot({"messages": messages})),
